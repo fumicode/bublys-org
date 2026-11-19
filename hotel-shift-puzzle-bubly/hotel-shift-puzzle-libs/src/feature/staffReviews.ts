@@ -19,7 +19,7 @@ export function staffReviewSummaries(
   return precedingReviews
     .map((report) => ({
       report,
-      score: report.stars.find((s) => s.staffId === staffId)?.score ?? 0,
+      score: report.contributions.find((s) => s.staffId === staffId)?.score ?? 0,
       compromises: report.compromises.filter((c) => c.staffId === staffId),
       busyDays: report.busyDayContributions.filter((d) => d.workedStaffIds.includes(staffId)),
       note: report.noteFor(staffId),

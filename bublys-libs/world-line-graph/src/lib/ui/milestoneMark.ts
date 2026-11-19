@@ -22,9 +22,9 @@ export type MilestoneFlagShape = {
 
 /** 旗の形を求める（純粋）。scale はビューの拡大率（canvas の魚眼などで小さくなる） */
 export function milestoneFlagShape(x: number, y: number, r: number, scale = 1): MilestoneFlagShape {
-  const poleH = 13 * scale;
-  const flagW = 9 * scale;
-  const flagH = 6 * scale;
+  const poleH = 16 * scale;
+  const flagW = 11 * scale;
+  const flagH = 7.5 * scale;
   const px = x + r * 0.5;
   const top = y - r - poleH;
   return {
@@ -36,3 +36,6 @@ export function milestoneFlagShape(x: number, y: number, r: number, scale = 1): 
     ],
   };
 }
+
+/** 節目ノードの輪（ノードの縁を金色で囲う）。半径 r のノードの外側に描く */
+export const MILESTONE_RING_RADIUS_OFFSET = 3;

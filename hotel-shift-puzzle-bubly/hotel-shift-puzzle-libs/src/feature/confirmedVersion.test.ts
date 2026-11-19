@@ -10,7 +10,7 @@ const confirmedOf = (scheduleId: string, month: number) =>
     storeId: 'st',
     compromises: [],
     busyDayContributions: [],
-    stars: [],
+    contributions: [],
   });
 
 describe('confirmedVersionOf（この勤務表が持っている確定版）', () => {

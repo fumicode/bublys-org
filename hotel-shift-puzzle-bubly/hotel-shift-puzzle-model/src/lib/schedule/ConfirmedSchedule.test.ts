@@ -19,7 +19,7 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
       busyDayContributions: [
         { dayKey: '2026-06-10', requiredCount: 5, workedStaffIds: ['staff-A', 'staff-B'] },
       ],
-      stars: [
+      contributions: [
         { staffId: 'staff-A', compromiseCount: 1, busyDayCount: 1, score: 3 },
         { staffId: 'staff-B', compromiseCount: 0, busyDayCount: 1, score: 1 },
       ],
@@ -35,20 +35,20 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
     const r = create();
     expect(r.compromises).toHaveLength(1);
     expect(r.busyDayContributions).toHaveLength(1);
-    expect(r.stars).toHaveLength(2);
+    expect(r.contributions).toHaveLength(2);
   });
 
-  test('starsOf はそのスタッフの★を返す（行が無ければ 0）', () => {
+  test('contributionOf はそのスタッフの貢献度を返す（行が無ければ 0）', () => {
     const r = create();
-    expect(r.starsOf('staff-A')).toBe(3);
-    expect(r.starsOf('staff-B')).toBe(1);
-    expect(r.starsOf('staff-Z')).toBe(0);
+    expect(r.contributionOf('staff-A')).toBe(3);
+    expect(r.contributionOf('staff-B')).toBe(1);
+    expect(r.contributionOf('staff-Z')).toBe(0);
   });
 
   test('★を「貢献度スコア」と呼んでいた頃の保存形（contributionScores）も読める', () => {
     const { stars, ...rest } = create().toPlain();
     const restored = ConfirmedSchedule.fromPlain({ ...rest, contributionScores: stars });
-    expect(restored.starsOf('staff-A')).toBe(3);
+    expect(restored.contributionOf('staff-A')).toBe(3);
     expect(restored.toPlain()).not.toHaveProperty('contributionScores');
   });
 
@@ -75,7 +75,7 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
       storeId: 'store-1',
       compromises: [],
       busyDayContributions: [],
-      stars: [{ staffId: 'staff-A', compromiseCount: 1, busyDayCount: 2, score: 4 }],
+      contributions: [{ staffId: 'staff-A', compromiseCount: 1, busyDayCount: 2, score: 4 }],
       confirmedAt: 2000,
     });
 
@@ -102,7 +102,7 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
       expect(next.noteFor('staff-A')).toBe('来月は休みを優先');
       // スコアは引き継いだ重みで出し直す（譲歩1×3 + 繁忙日2×1）
       expect(next.compromiseWeight).toBe(3);
-      expect(next.starsOf('staff-A')).toBe(5);
+      expect(next.contributionOf('staff-A')).toBe(5);
     });
 
     test('別の店舗・月の確定版は置き換えられない', () => {
@@ -163,7 +163,7 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
 
     expect(reweighted.compromiseWeight).toBe(1);
     expect(reweighted.busyDayWeight).toBe(3);
-    expect(reweighted.stars).toEqual([
+    expect(reweighted.contributions).toEqual([
       { staffId: 'staff-A', compromiseCount: 1, busyDayCount: 1, score: 4 }, // 1*1+1*3
       { staffId: 'staff-B', compromiseCount: 0, busyDayCount: 1, score: 3 }, // 0*1+1*3
     ]);
@@ -179,7 +179,7 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
     const base = create();
     const reweighted = base.reweight(0, 5);
 
-    expect(reweighted.stars).toEqual([
+    expect(reweighted.contributions).toEqual([
       { staffId: 'staff-A', compromiseCount: 1, busyDayCount: 1, score: 5 },
       { staffId: 'staff-B', compromiseCount: 0, busyDayCount: 1, score: 5 },
     ]);
@@ -189,7 +189,7 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
     const reweighted = create().reweight(-1, -2);
     expect(reweighted.compromiseWeight).toBe(0);
     expect(reweighted.busyDayWeight).toBe(0);
-    expect(reweighted.stars.every((s) => s.score === 0)).toBe(true);
+    expect(reweighted.contributions.every((s) => s.score === 0)).toBe(true);
   });
 
   test('重みも toPlain / fromPlain でラウンドトリップできる', () => {
@@ -214,7 +214,7 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
   test('確定時刻を持てる。toPlain / fromPlain で残り、古い記録には無い', () => {
     const report = ConfirmedSchedule.create({
       scheduleId: 's', worldLineNodeId: 'n', year: 2026, month: 6, storeId: 'store-1',
-      compromises: [], busyDayContributions: [], stars: [],
+      compromises: [], busyDayContributions: [], contributions: [],
       confirmedAt: 1700000000000,
     });
     expect(ConfirmedSchedule.fromPlain(report.toPlain()).confirmedAt).toBe(1700000000000);

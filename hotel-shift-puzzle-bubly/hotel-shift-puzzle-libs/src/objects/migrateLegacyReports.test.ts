@@ -48,7 +48,7 @@ const legacy = (
     storeId: params.storeId ?? "st",
     compromises: [],
     busyDayContributions: [],
-    stars: [],
+    contributions: [],
     confirmedAt: params.confirmedAt,
   });
   const plain = { ...fresh.toPlain(), id: `${scheduleId}:${nodeId}` };
@@ -91,7 +91,7 @@ describe("migrateLegacyReports（旧形式の完成レポートを確定版に�
       storeId: "st",
       compromises: [],
       busyDayContributions: [],
-      stars: [],
+      contributions: [],
       confirmedAt: 500,
     });
     saveObject(store, CONFIRMED_SCHEDULE_TYPE, current);

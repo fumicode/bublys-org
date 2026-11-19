@@ -68,7 +68,7 @@ const reportOf = (
     storeId: params.storeId ?? 'st',
     compromises: [],
     busyDayContributions: [],
-    stars: [{ staffId: 's1', compromiseCount: 1, busyDayCount: 1, score: 3 }],
+    contributions: [{ staffId: 's1', compromiseCount: 1, busyDayCount: 1, score: 3 }],
     confirmedAt: params.confirmedAt,
   });
 
@@ -79,7 +79,7 @@ describe('前月の確定版と、引き継ぎの知らせ', () => {
       source: { scheduleId, worldLineNodeId: nodeId },
       days: [WorkingDay.of(2026, 5, 31)],
       cells: [],
-      ...(scores ? { stars: [{ staffId: 's1', compromiseCount: 0, busyDayCount: 0, score: 7 }] } : {}),
+      ...(scores ? { contributions: [{ staffId: 's1', compromiseCount: 0, busyDayCount: 0, score: 7 }] } : {}),
     });
 
   test('引き継ぐのは、同じ店舗の1か月前の確定版だけ', () => {
@@ -157,7 +157,7 @@ describe('前月の確定版から写し取って、今月の勤務表に焼き�
     expect(tail?.shiftNameOn('s1', may(31))).toBe('遅番');
     expect(tail?.trailingWorkdays('s1')).toBe(5);
     expect(tail?.cellOf('s2', may(31))?.value).toEqual({ kind: 'day-off' });
-    expect(tail?.starsOf('s1')).toBe(3);
+    expect(tail?.contributionOf('s1')).toBe(3);
   });
 
   test('引き継ぎ付きで作った今月は、引き継ぎを起点に持ち、前月末からの連勤を持ち越す', async () => {
@@ -170,7 +170,7 @@ describe('前月の確定版から写し取って、今月の勤務表に焼き�
     expect(born?.precedingTail?.source).toEqual(report.version);
     // ★は自動で引き継ぐが、休みの優先度に使うのは既定でオフ
     const constraints = readFromScope<ConstraintSet>(store, scope, CONSTRAINT_SET_TYPE, created.id);
-    expect(constraints?.useStarPriority).toBe(false);
+    expect(constraints?.useContributionPriority).toBe(false);
 
     const june: MonthlyStaffSchedule = created.assignShift('s1', WorkingDay.of(2026, 6, 1), 'middle');
     const violations = new MaxConsecutiveWorkdaysConstraint(5).check(june);

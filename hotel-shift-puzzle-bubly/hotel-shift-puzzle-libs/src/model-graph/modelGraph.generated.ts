@@ -86,8 +86,8 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": false
         },
         {
-          "name": "stars",
-          "type": "StarEntry[]",
+          "name": "contributions",
+          "type": "ContributionEntry[]",
           "optional": false
         },
         {
@@ -123,7 +123,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "confirmedAt",
         "compromises",
         "busyDayContributions",
-        "stars",
+        "contributions",
         "compromiseWeight",
         "busyDayWeight",
         "considerationNotes"
@@ -197,7 +197,7 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": true
         },
         {
-          "name": "starsOf",
+          "name": "contributionOf",
           "params": [
             "staffId"
           ],
@@ -339,7 +339,7 @@ export const MODEL_GRAPH: ModelGraph = {
       "getters": [
         "id",
         "maxConsecutiveWorkdays",
-        "useStarPriority",
+        "useContributionPriority",
         "checkShiftWish",
         "checkAllowedShift",
         "minMonthlyDayOff",
@@ -430,7 +430,7 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": true
         },
         {
-          "name": "withUseStarPriority",
+          "name": "withUseContributionPriority",
           "params": [
             "use"
           ],
@@ -1304,14 +1304,14 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": false
         },
         {
-          "name": "stars",
-          "type": "StarEntry[]",
+          "name": "contributions",
+          "type": "ContributionEntry[]",
           "optional": true
         }
       ],
       "getters": [
         "source",
-        "stars",
+        "contributions",
         "confirmedAt",
         "days",
         "lastDay",
@@ -1329,7 +1329,7 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": true
         },
         {
-          "name": "starsOf",
+          "name": "contributionOf",
           "params": [
             "staffId"
           ],

@@ -1,5 +1,5 @@
 import { Staff, ConfirmedSchedule } from '@bublys-org/hotel-shift-puzzle-model';
-import { prioritizeStaffByStars } from './starPriority.js';
+import { prioritizeStaffByContribution as prioritizeStaffByStars } from './contributionPriority.js';
 
 const staffA = new Staff({ id: 'staff-A', name: 'A' });
 const staffB = new Staff({ id: 'staff-B', name: 'B' });
@@ -16,13 +16,13 @@ const reportWithScores = (scores: { staffId: string; score: number }[]) =>
     storeId: 'store-1',
     compromises: [],
     busyDayContributions: [],
-    stars: scores.map((s) => ({
+    contributions: scores.map((s) => ({
       staffId: s.staffId,
       compromiseCount: 0,
       busyDayCount: 0,
       score: s.score,
     })),
-  }).stars;
+  }).contributions;
 
 const idsOf = (staff: Staff[]) => staff.map((s) => s.id);
 

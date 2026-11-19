@@ -81,7 +81,7 @@ describe("runMarksOf — 連勤・連休の線の置き場所", () => {
       });
       return PrecedingMonthTail.capture({
         source: { scheduleId: "may", worldLineNodeId: "n" },
-        stars: [],
+        contributions: [],
         schedule: may,
         shiftNameOf: () => "早番",
         length: row.length,

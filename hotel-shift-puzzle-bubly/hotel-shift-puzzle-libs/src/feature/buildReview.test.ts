@@ -110,7 +110,7 @@ describe('buildReview（確定時の振り返りの計算）', () => {
     });
 
     // staff-A: 譲歩2件(連勤+希望)・繁忙日1回(6/2出勤) → 2*2+1=5
-    expect(report.stars).toEqual([
+    expect(report.contributions).toEqual([
       { staffId: 'staff-A', compromiseCount: 2, busyDayCount: 1, score: 5 },
       { staffId: 'staff-B', compromiseCount: 0, busyDayCount: 1, score: 1 },
       { staffId: 'staff-C', compromiseCount: 0, busyDayCount: 1, score: 1 },
@@ -132,6 +132,6 @@ describe('buildReview（確定時の振り返りの計算）', () => {
     });
     expect(report.busyDayContributions).toEqual([]);
     expect(report.compromises).toEqual([]);
-    expect(report.stars).toEqual([]);
+    expect(report.contributions).toEqual([]);
   });
 });

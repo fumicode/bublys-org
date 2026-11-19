@@ -9,7 +9,7 @@
  *     違反（ConstraintViolation.staffId が付くもの）をすべて譲歩として数える。
  *     責任者不足・休み上限超過など日単位（誰のせいでもない）の違反は個人の譲歩に含めない。
  *   - #88 繁忙日: 稼働日ごとの必要人数合計が平均を上回る日を自動的に繁忙日とする。
- *   - #89 ★: 譲歩回数・繁忙日出勤回数の加重合計（シンプルな加重合計）。重みは
+ *   - #89 貢献度: 譲歩回数・繁忙日出勤回数の加重合計（シンプルな加重合計）。重みは
  *     model層の DEFAULT_COMPROMISE_WEIGHT/DEFAULT_BUSY_DAY_WEIGHT を確定時点の初期値として
  *     使う（確定後は ConfirmedSchedule.reweight() でシフト管理者が調整できる）。
  */
@@ -20,7 +20,7 @@ import {
   type ScheduleConstraint,
   type CompromiseEntry,
   type BusyDayEntry,
-  type StarEntry,
+  type ContributionEntry,
 } from "@bublys-org/hotel-shift-puzzle-model";
 
 export type BuildReviewArgs = {
@@ -34,7 +34,7 @@ export type BuildReviewArgs = {
 export type ReviewDraft = {
   compromises: CompromiseEntry[];
   busyDayContributions: BusyDayEntry[];
-  stars: StarEntry[];
+  contributions: ContributionEntry[];
 };
 
 /**
@@ -89,7 +89,7 @@ function computeContributionScores(
   staffIds: string[],
   compromises: CompromiseEntry[],
   busyDayContributions: BusyDayEntry[]
-): StarEntry[] {
+): ContributionEntry[] {
   const compromiseCounts = new Map<string, number>();
   for (const c of compromises) {
     compromiseCounts.set(c.staffId, (compromiseCounts.get(c.staffId) ?? 0) + 1);
@@ -116,14 +116,14 @@ function computeContributionScores(
     .sort((a, b) => b.score - a.score);
 }
 
-/** 確定時に呼ぶ: 譲歩・繁忙日対応・★をまとめて計算する */
+/** 確定時に呼ぶ: 譲歩・繁忙日対応・貢献度をまとめて計算する */
 export function buildReview(args: BuildReviewArgs): ReviewDraft {
   const compromises = computeCompromises(args.schedule, args.constraints);
   const busyDayContributions = computeBusyDayContributions(args.schedule);
-  const stars = computeContributionScores(
+  const contributions = computeContributionScores(
     args.staffIds,
     compromises,
     busyDayContributions
   );
-  return { compromises, busyDayContributions, stars };
+  return { compromises, busyDayContributions, contributions };
 }

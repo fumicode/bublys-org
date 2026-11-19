@@ -30,7 +30,7 @@
  * 不変。
  */
 import { WorkingDay, type WorkingDayState } from "./WorkingDay.js";
-import type { ConfirmedVersion, StarEntry } from "./ConfirmedSchedule.js";
+import type { ConfirmedVersion, ContributionEntry } from "./ConfirmedSchedule.js";
 // 型だけ（MonthlyStaffSchedule 側がこのクラスを値として使うので、実行時の循環を作らない）
 import type { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 
@@ -115,10 +115,10 @@ export type PrecedingMonthTailState = {
   /** 写し取ったセル（出勤・休みのみ。未定は持たない） */
   cells: PrecedingCell[];
   /**
-   * 写し取った★。undefined は★を写す前に引き継いだ古い形
+   * 写し取った貢献度。undefined は貢献度を写す前に引き継いだ古い形
    * （#231 より前。0点の人ばかりの [] とは違う）。
    */
-  stars?: StarEntry[];
+  contributions?: ContributionEntry[];
 };
 
 export type PrecedingMonthTailPlain = {
@@ -131,9 +131,10 @@ export type PrecedingMonthTailPlain = {
   confirmedAt?: number;
   days: WorkingDayState[];
   cells: PrecedingCellPlain[];
-  stars?: StarEntry[];
-  /** 旧形式：★を「貢献度スコア」と呼んでいた頃の名前。読むときだけ受け付ける */
-  contributionScores?: StarEntry[];
+  /** 保存キーは旧名 stars のまま（世界線を壊さない） */
+  stars?: ContributionEntry[];
+  /** 旧形式：contributionScores で保存されたデータも読む */
+  contributionScores?: ContributionEntry[];
 };
 
 /** 旧形式の振り返り ID（"勤務表ID:ノードID"）を版へ読み替える。最初のコロンで切る */
@@ -160,8 +161,8 @@ export class PrecedingMonthTail {
     schedule: MonthlyStaffSchedule;
     shiftNameOf: (shiftId: string) => string | undefined;
     length: number;
-    /** 前月の確定版の振り返りの★。一緒に写し取る */
-    stars: readonly StarEntry[];
+    /** 前月の確定版の振り返りの貢献度。一緒に写し取る */
+    contributions: readonly ContributionEntry[];
   }): PrecedingMonthTail {
     const all = params.schedule.workingDays();
     const days = all.slice(Math.max(0, all.length - params.length));
@@ -182,7 +183,7 @@ export class PrecedingMonthTail {
       confirmedAt: params.confirmedAt,
       days,
       cells,
-      stars: params.stars.map((s) => ({ ...s })),
+      contributions: params.contributions.map((s) => ({ ...s })),
     });
   }
 
@@ -191,14 +192,14 @@ export class PrecedingMonthTail {
     return this.state.source;
   }
 
-  /** 写し取った★。★を写す前の古い形なら undefined */
-  get stars(): StarEntry[] | undefined {
-    return this.state.stars;
+  /** 写し取った貢献度。貢献度を写す前の古い形なら undefined */
+  get contributions(): ContributionEntry[] | undefined {
+    return this.state.contributions;
   }
 
-  /** そのスタッフの写し取った★。行が無ければ 0 */
-  starsOf(staffId: string): number {
-    return this.state.stars?.find((s) => s.staffId === staffId)?.score ?? 0;
+  /** そのスタッフの写し取った貢献度。行が無ければ 0 */
+  contributionOf(staffId: string): number {
+    return this.state.contributions?.find((s) => s.staffId === staffId)?.score ?? 0;
   }
 
   get confirmedAt(): number | undefined {
@@ -291,8 +292,8 @@ export class PrecedingMonthTail {
       cells: this.state.cells.map((c) => c.toPlain()),
     };
     if (this.state.confirmedAt !== undefined) plain.confirmedAt = this.state.confirmedAt;
-    if (this.state.stars !== undefined) {
-      plain.stars = this.state.stars.map((s) => ({ ...s }));
+    if (this.state.contributions !== undefined) {
+      plain.stars = this.state.contributions.map((s) => ({ ...s }));
     }
     return plain;
   }
@@ -311,7 +312,7 @@ export class PrecedingMonthTail {
       days: plain.days.map((d) => new WorkingDay({ ...d })),
       cells: plain.cells.map((c) => PrecedingCell.fromPlain(c)),
       ...((plain.stars ?? plain.contributionScores)
-        ? { stars: (plain.stars ?? plain.contributionScores ?? []).map((s) => ({ ...s })) }
+        ? { contributions: (plain.stars ?? plain.contributionScores ?? []).map((s) => ({ ...s })) }
         : {}),
     });
   }

@@ -24,7 +24,7 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
   const capture = (length = 7) =>
     PrecedingMonthTail.capture({
       source: { scheduleId: 'may', worldLineNodeId: 'node-1' },
-      stars: [],
+      contributions: [],
       confirmedAt: 1000,
       schedule: maySchedule(),
       shiftNameOf: (id) => SHIFT_NAMES[id],
@@ -54,7 +54,7 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
   test('定義から消えた勤務帯でも、出勤だった事実は落とさない（IDを名前として残す）', () => {
     const tail = PrecedingMonthTail.capture({
       source: { scheduleId: 'r', worldLineNodeId: '' },
-      stars: [],
+      contributions: [],
       schedule: maySchedule(),
       shiftNameOf: () => undefined,
       length: 1,
@@ -71,7 +71,7 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
     const dec = MonthlyStaffSchedule.create({ id: 'dec', storeId: 's', year: 2025, month: 12 });
     const decTail = PrecedingMonthTail.capture({
       source: { scheduleId: 'r', worldLineNodeId: '' },
-      stars: [],
+      contributions: [],
       schedule: dec,
       shiftNameOf: () => undefined,
       length: 7,
@@ -86,14 +86,14 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
       schedule: maySchedule(),
       shiftNameOf: (id) => SHIFT_NAMES[id],
       length: 7,
-      stars: scores,
+      contributions: scores,
     });
     scores[0].score = 99;
 
-    expect(tail.starsOf('A')).toBe(5);
-    expect(tail.starsOf('新人')).toBe(0);
+    expect(tail.contributionOf('A')).toBe(5);
+    expect(tail.contributionOf('新人')).toBe(0);
     const back = PrecedingMonthTail.fromPlain(JSON.parse(JSON.stringify(tail.toPlain())));
-    expect(back.stars).toEqual([
+    expect(back.contributions).toEqual([
       { staffId: 'A', compromiseCount: 2, busyDayCount: 1, score: 5 },
     ]);
   });
@@ -108,8 +108,8 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
 
     expect(tail.source).toEqual({ scheduleId: 'may', worldLineNodeId: 'node-1' });
     // ★を写す前の形は「0点ばかり」と区別する
-    expect(tail.stars).toBeUndefined();
-    expect(tail.starsOf('A')).toBe(0);
+    expect(tail.contributions).toBeUndefined();
+    expect(tail.contributionOf('A')).toBe(0);
     expect(tail.toPlain()).not.toHaveProperty('sourceReportId');
   });
 
@@ -119,10 +119,10 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
       schedule: maySchedule(),
       shiftNameOf: (id) => SHIFT_NAMES[id],
       length: 7,
-      stars: [{ staffId: 'A', compromiseCount: 1, busyDayCount: 0, score: 2 }],
+      contributions: [{ staffId: 'A', compromiseCount: 1, busyDayCount: 0, score: 2 }],
     }).toPlain();
     const restored = PrecedingMonthTail.fromPlain({ ...rest, contributionScores: stars });
-    expect(restored.starsOf('A')).toBe(2);
+    expect(restored.contributionOf('A')).toBe(2);
     expect(restored.toPlain()).not.toHaveProperty('contributionScores');
   });
 

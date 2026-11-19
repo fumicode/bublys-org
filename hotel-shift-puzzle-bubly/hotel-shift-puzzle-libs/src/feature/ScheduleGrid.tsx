@@ -57,7 +57,7 @@ import {
   nextForcedCellAfter,
 } from "./candidates/index.js";
 import { scheduleConstraintsOf, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
-import { prioritizeStaffByStars } from "./starPriority.js";
+import { prioritizeStaffByContribution } from "./contributionPriority.js";
 import { buildReview } from "./buildReview.js";
 import {
   captureInheritance,
@@ -67,7 +67,6 @@ import {
   precedingConfirmedOf,
 } from "./precedingMonth.js";
 import { versionLabelFor } from "./versionLabel.js";
-import { ConfirmedReview } from "./ConfirmedReview.js";
 import { useConfirmedVersion } from "./confirmedVersion.js";
 import { useScheduleHistory } from "./useScheduleHistory.js";
 import { scheduleUndoBindings } from "./scheduleWorldLineKeys.js";
@@ -151,6 +150,12 @@ type ScheduleGridProps = {
    * 注入する（URL スキームと同じ流儀）。渡さなければ main thread で同期計算する。
    */
   createCandidatesWorker?: () => Worker;
+  /** 振り返りバブルの URL（data-url アンカー用）。「振り返りを開く」ボタンから link bubble が伸びる */
+  reviewUrl?: string;
+  /** 振り返りバブルを開く。確定後に自動で開くときもこれを使う */
+  onOpenReview?: () => void;
+  /** 前月の振り返りバブルの URL を作る（前月の勤務表IDを渡す）。引き継ぎ欄から開く */
+  precedingReviewUrl?: (scheduleId: string) => string;
 };
 
 /** 新しい責任者ルールの一意キーを生成する。 */
@@ -175,6 +180,9 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   reservationInfoUrl,
   onOpenRule,
   createCandidatesWorker,
+  reviewUrl,
+  onOpenReview,
+  precedingReviewUrl,
 }) => {
   const store = useAppStore();
   const { scope } = useScheduleHistory();
@@ -261,17 +269,13 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   const inherited = schedule?.precedingTail;
   // 作った後に前月の確定版が置き換わっても、あとから確定しても、勝手には取り込まない。知らせるだけ
   const pendingInheritance = pendingInheritanceOf(precedingConfirmed, inherited);
-  // 引き継いだ★は、スイッチがオンのときだけ自動シフトの優先度（と★の表示）に使う
-  const priorityStars = constraints?.useStarPriority
+  // 引き継いだ貢献度は、スイッチがオンのときだけ自動シフトの優先度（と★の表示）に使う
+  const priorityStars = constraints?.useContributionPriority
     ? inheritedScoresOf(inherited, precedingConfirmed)
     : undefined;
   const [importingInheritance, setImportingInheritance] = useState(false);
   // この勤務表が持っている確定版（あれば振り返りを出す）と、その版のノードの名前
   const confirmedVersion = useConfirmedVersion(scheduleId);
-  const confirmedNodeLabel = confirmedVersion
-    ? scope.graph.state.nodes[confirmedVersion.worldLineNodeId]?.label
-    : undefined;
-  const [reviewOpen, setReviewOpen] = useState(false);
   // 確定版の読み出しは非同期なので、記録するときは待っている間の編集を含む最新の値へ載せる
   const latestRef = useRef({ schedule, constraints });
   latestRef.current = { schedule, constraints };
@@ -588,10 +592,10 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   };
 
   // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる。
-  // 前月の確定版から引き継いだ★が高い人を先に処理する（休みの取得優先権に効く。詳しくは starPriority.ts）。
+  // 前月の確定版から引き継いだ貢献度が高い人を先に処理する（休みの取得優先権に効く。詳しくは contributionPriority.ts）。
   // 並び順が効くステップ（grantsDayOffInStaffOrder）を実行したときだけ、優先したことを伝える。
   const handleRunStep = (step: AutoShiftStep) => {
-    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByStars(
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByContribution(
       subsetStaff,
       priorityStars
     );
@@ -615,7 +619,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   const handleGenerateCandidates = () => {
     if (!scheduleId) return;
     // 前月の確定版から引き継いだ★が高い人を先に処理する（handleRunStep と同じ優先度づけ）。
-    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByStars(
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByContribution(
       subsetStaff,
       priorityStars
     );
@@ -701,10 +705,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   // 確定版は店舗×月で1つなので、すでにあれば置き換わる（別の勤務表の版でも）。置き換えても
   // 手で書いた部分（タイトル・配慮メモ・重み）は引き継ぐ（ConfirmedSchedule.confirm）。
   // apex には「◯月◯日版」の名前を付ける（既に名前があれば尊重して残す）。
-  // 確定したら、その場で振り返りの欄を開く（振り返りは独立したバブルを持たない）。
-  //
-  // いまの版がすでに確定版なら作り直さず、振り返りを開くだけ（振り返りは確定時点の
-  // スナップショットなので、押し直しで出し直す理由が無い）。
+  // 確定したら振り返りバブルを開く。いまの版がすでに確定版なら作り直さず開くだけ。
   // 世界線のノードから状態を取り出すので resolveObjectsAt を使う（同期の getObjectAt だと
   // メモリから追い出されたぶんが黙って読めず、何も起きないボタンになる）。
   const handleConfirm = async () => {
@@ -714,7 +715,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       (r) => r.id === ConfirmedSchedule.idFor(schedule.storeId, schedule.year, schedule.month)
     );
     if (currentConfirmed?.isVersion({ scheduleId, worldLineNodeId: apex.id })) {
-      setReviewOpen(true);
+      onOpenReview?.();
       return;
     }
 
@@ -767,7 +768,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       scope.setNodeLabel(apex.id, versionLabelFor(new Date(confirmedAt), labels));
     }
 
-    setReviewOpen(true);
+    onOpenReview?.();
   };
 
   // 行＝勤務スタッフ群のメンバーなので、その並びの続きに導線を置く（ヘッダには出さない）
@@ -826,18 +827,33 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     </>
   );
 
-  const confirmButton = (
-    <button
-      type="button"
-      className="e-confirm"
-      onClick={() => void handleConfirm()}
-      title={
-        "いま見ている版を、この月の確定版にします（すでに確定版があれば置き換わります）。" +
-        "翌月の勤務表は、確定版から引き継いで始まります"
-      }
-    >
-      🏁 確定する
-    </button>
+  const confirmArea = (
+    <div className="e-confirm-area">
+      <button
+        type="button"
+        className="e-confirm"
+        onClick={() => void handleConfirm()}
+        title={
+          "いま見ている版を、この月の確定版にします（すでに確定版があれば置き換わります）。" +
+          "翌月の勤務表は、確定版から引き継いで始まります"
+        }
+      >
+        🏁 確定する
+      </button>
+      {confirmedVersion && reviewUrl && (
+        <ObjectView
+          type={CONFIRMED_SCHEDULE_TYPE}
+          id={confirmedVersion.id}
+          url={reviewUrl}
+          label={`${schedule?.year ?? ""}年${schedule?.month ?? ""}月の振り返り`}
+          openingPosition="bubble-side-left"
+        >
+          <span className="e-review-opener" title="ダブルクリックで振り返りを開く">
+            振り返り
+          </span>
+        </ObjectView>
+      )}
+    </div>
   );
 
   return (
@@ -850,7 +866,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
 
         {/* 見出し行には、スタッフ列の見え方ではなく勤務表（この月）そのものに紐づくものを置く */}
         <div className="e-actions e-actions-left">
-          {/* この月のシフト希望（回収状況）。押す前から在るものなのでダブルクリックで開く。 */}
+          {/* この月のシフト希望（回収状況）。押す前から在るものなのでダブルクリックで開く */}
           {shiftWishesUrl && (
             <ObjectView
               type={SHIFT_WISH_MONTH_VIEW_TYPE}
@@ -883,11 +899,12 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
             onImport={() => void handleImportInheritance()}
             busy={importingInheritance}
             wrapSource={(node) =>
-              inherited ? (
+              inherited && precedingReviewUrl ? (
                 <ObjectView
-                  type={SCHEDULE_TYPE}
-                  id={inherited.source.scheduleId}
-                  label={inherited.yearMonth ? `${inherited.yearMonth.year}年${inherited.yearMonth.month}月の勤務表` : "前月の勤務表"}
+                  type={CONFIRMED_SCHEDULE_TYPE}
+                  id={precedingConfirmed?.id ?? inherited.source.scheduleId}
+                  url={precedingReviewUrl(inherited.source.scheduleId)}
+                  label={inherited.yearMonth ? `${inherited.yearMonth.year}年${inherited.yearMonth.month}月の振り返り` : "前月の振り返り"}
                   openingPosition="origin-side"
                   draggable={false}
                 >
@@ -899,6 +916,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
             }
           />
         </div>
+        {/* 右上：確定する＋振り返り */}
+        {confirmArea}
       </div>
 
       {/* 左: 適用中の制約を動的アイコンで描く（稼働日ごと↕ / 人ごと↔ / 全体）
@@ -1050,25 +1069,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
                 </span>
               </ObjectView>
           )}
-          {confirmButton}
       </div>
-
-      {/* この勤務表が確定版を持っていれば、その振り返り（独立したバブルは持たない。#231）。
-          確定した直後は開いて出す。前月の勤務表を開いたときも、ここで振り返りが見られる */}
-      {confirmedVersion && (
-        <details
-          className="e-review"
-          open={reviewOpen}
-          onToggle={(e) => setReviewOpen(e.currentTarget.open)}
-        >
-          <summary>
-            🏁 {confirmedVersion.year}年{confirmedVersion.month}月の確定版
-            {confirmedNodeLabel && <span className="e-review-version">（{confirmedNodeLabel}）</span>}
-            の振り返り
-          </summary>
-          <ConfirmedReview report={confirmedVersion} editable />
-        </details>
-      )}
     </StyledContainer>
   );
 };
@@ -1288,12 +1289,39 @@ const StyledContainer = styled.div`
   }
 
 
-  /* 左下：世界線ビュー・キセキの木・確定する */
+  /* 左下：世界線ビュー・キセキの木 */
   .e-footer {
     margin-top: 8px;
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  /* 右上：確定する＋振り返り展開口 */
+  .e-confirm-area {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto; /* ヘッダの右端へ寄せる */
+  }
+
+  .e-review-opener {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #2e7d32;
+    border-radius: 6px;
+    background: #e8f5e9;
+    color: #2e7d32;
+    font-size: 0.8em;
+    font-weight: 600;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+
+    &:hover {
+      background: #c8e6c9;
+      border-color: #388e3c;
+    }
   }
 
   /* 確定する（いま見ている版をこの月の確定版にする） */
@@ -1311,26 +1339,6 @@ const StyledContainer = styled.div`
     &:hover {
       background: #e8f5e9;
       border-color: #388e3c;
-    }
-  }
-
-  /* この勤務表が持っている確定版の振り返り（確定した直後は開いて出す） */
-  .e-review {
-    margin-top: 10px;
-    border: 1px solid #ffe082;
-    border-radius: 8px;
-    background: #fffdf5;
-
-    > summary {
-      padding: 6px 10px;
-      font-size: 0.82em;
-      font-weight: 600;
-      color: #8d6e00;
-      cursor: pointer;
-    }
-    .e-review-version {
-      font-weight: normal;
-      color: #b0a060;
     }
   }
 

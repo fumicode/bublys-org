@@ -6,7 +6,7 @@
  * もう一度確定すると同じ ID のまま置き換わる（{@link ConfirmedSchedule.confirm}）。別の勤務表で
  * 確定しても置き換わる。どの勤務表のどの版かは scheduleId / worldLineNodeId が持つ。
  *
- * 振り返り（譲歩 #87・繁忙日対応 #88・★ #89）は、確定版を「その月どうだったか」の
+ * 振り返り（譲歩 #87・繁忙日対応 #88・貢献度 #89）は、確定版を「その月どうだったか」の
  * 角度から見たもの。確定時点のスナップショットとして持ち、以降スタッフの希望や勤務表が
  * 変わっても変化しない。置き換えると新しい版の振り返りになり、古い版の振り返りは残さない。
  * 自由記述の配慮メモ（considerationNotes）・タイトル（title）・譲歩/繁忙日の重み
@@ -14,9 +14,9 @@
  * 削除は集約自体をリポジトリから取り除く操作（feature 層が useObjectRepo.remove で行う）
  * なので、ここにはメソッドを持たない。
  *
- * 重みはシフト管理者によって★の感じ方が異なるため直接編集できるようにしている。
+ * 重みはシフト管理者によって貢献度の感じ方が異なるため直接編集できるようにしている。
  * reweight() は譲歩・繁忙日の生データ（compromises/busyDayContributions/各エントリの
- * compromiseCount/busyDayCount）は変えず、重みと stars の score だけを
+ * compromiseCount/busyDayCount）は変えず、重みと contributions の score だけを
  * 再計算する（「何が起きたか」という事実は確定時点のまま、「どう評価するか」という
  * 重みだけを後から調整できる）。
  *
@@ -50,13 +50,16 @@ export type BusyDayEntry = {
   workedStaffIds: string[];
 };
 
-/** スタッフごとの★（譲歩回数・繁忙日出勤回数の加重合計）。#89 */
-export type StarEntry = {
+/** スタッフごとの貢献度（譲歩回数・繁忙日出勤回数の加重合計）。UI では★アイコンで表す。#89 */
+export type ContributionEntry = {
   staffId: string;
   compromiseCount: number;
   busyDayCount: number;
   score: number;
 };
+
+/** @deprecated ContributionEntry に改名。保存形との互換のため残す */
+export type StarEntry = ContributionEntry;
 
 /** 譲歩1件あたりの重みの既定値（#89 スコア算出） */
 export const DEFAULT_COMPROMISE_WEIGHT = 2;
@@ -84,7 +87,7 @@ export type ConfirmedScheduleState = {
   title: string;
   compromises: CompromiseEntry[];
   busyDayContributions: BusyDayEntry[];
-  stars: StarEntry[];
+  contributions: ContributionEntry[];
   /** staffId → 自由記述の配慮メモ（確定後も編集可） */
   considerationNotes: Record<string, string>;
   /** 譲歩1件あたりの重み（確定後も reweight で編集可） */
@@ -98,11 +101,11 @@ export type ConfirmedScheduleState = {
   confirmedAt?: number;
 };
 
-/** シリアライズ用 */
-export type ConfirmedSchedulePlain = Omit<ConfirmedScheduleState, "stars"> & {
-  stars?: StarEntry[];
-  /** 旧形式：★を「貢献度スコア」と呼んでいた頃の名前。読むときだけ受け付ける */
-  contributionScores?: StarEntry[];
+/** シリアライズ用。保存キーは旧名 stars のまま（世界線を壊さない） */
+export type ConfirmedSchedulePlain = Omit<ConfirmedScheduleState, "contributions"> & {
+  stars?: ContributionEntry[];
+  /** 旧形式：contributionScores で保存されたデータも読む */
+  contributionScores?: ContributionEntry[];
 };
 
 export class ConfirmedSchedule {
@@ -139,7 +142,7 @@ export class ConfirmedSchedule {
     storeId: string;
     compromises: CompromiseEntry[];
     busyDayContributions: BusyDayEntry[];
-    stars: StarEntry[];
+    contributions: ContributionEntry[];
     /** 確定時刻（epoch ms）。時刻の取得は上位層の仕事 */
     confirmedAt?: number;
   }): ConfirmedSchedule {
@@ -153,7 +156,7 @@ export class ConfirmedSchedule {
       title: ConfirmedSchedule.defaultTitle(params.year, params.month),
       compromises: params.compromises,
       busyDayContributions: params.busyDayContributions,
-      stars: params.stars,
+      contributions: params.contributions,
       considerationNotes: {},
       compromiseWeight: DEFAULT_COMPROMISE_WEIGHT,
       busyDayWeight: DEFAULT_BUSY_DAY_WEIGHT,
@@ -249,13 +252,13 @@ export class ConfirmedSchedule {
     return this.state.busyDayContributions;
   }
 
-  get stars(): StarEntry[] {
-    return this.state.stars;
+  get contributions(): ContributionEntry[] {
+    return this.state.contributions;
   }
 
-  /** そのスタッフの★（スコアの行が無ければ 0） */
-  starsOf(staffId: string): number {
-    return this.state.stars.find((s) => s.staffId === staffId)?.score ?? 0;
+  /** そのスタッフの貢献度（スコアの行が無ければ 0） */
+  contributionOf(staffId: string): number {
+    return this.state.contributions.find((s) => s.staffId === staffId)?.score ?? 0;
   }
 
   get compromiseWeight(): number {
@@ -267,7 +270,7 @@ export class ConfirmedSchedule {
   }
 
   /**
-   * 譲歩・繁忙日の重みを変更し、★（stars の score、降順の並び）を
+   * 譲歩・繁忙日の重みを変更し、貢献度（contributions の score、降順の並び）を
    * 再計算した新インスタンスを返す。不変。負の重みは 0 に丸める。
    * 生データ（compromises/busyDayContributions/各エントリの compromiseCount/busyDayCount）は
    * 変えない（「何が起きたか」は確定時点のまま、「どう評価するか」だけを調整する）。
@@ -275,14 +278,14 @@ export class ConfirmedSchedule {
   reweight(compromiseWeight: number, busyDayWeight: number): ConfirmedSchedule {
     const w1 = Math.max(0, compromiseWeight);
     const w2 = Math.max(0, busyDayWeight);
-    const stars = this.state.stars
+    const contributions = this.state.contributions
       .map((s) => ({ ...s, score: s.compromiseCount * w1 + s.busyDayCount * w2 }))
       .sort((a, b) => b.score - a.score);
     return new ConfirmedSchedule({
       ...this.state,
       compromiseWeight: w1,
       busyDayWeight: w2,
-      stars,
+      contributions,
     });
   }
 
@@ -320,7 +323,7 @@ export class ConfirmedSchedule {
         ...b,
         workedStaffIds: [...b.workedStaffIds],
       })),
-      stars: this.state.stars.map((s) => ({ ...s })),
+      stars: this.state.contributions.map((s) => ({ ...s })),
       considerationNotes: { ...this.state.considerationNotes },
       compromiseWeight: this.state.compromiseWeight,
       busyDayWeight: this.state.busyDayWeight,
@@ -342,7 +345,7 @@ export class ConfirmedSchedule {
         ...b,
         workedStaffIds: [...b.workedStaffIds],
       })),
-      stars: (plain.stars ?? plain.contributionScores ?? []).map((s) => ({ ...s })),
+      contributions: (plain.stars ?? plain.contributionScores ?? []).map((s) => ({ ...s })),
       considerationNotes: { ...(plain.considerationNotes ?? {}) },
       compromiseWeight: plain.compromiseWeight ?? DEFAULT_COMPROMISE_WEIGHT,
       busyDayWeight: plain.busyDayWeight ?? DEFAULT_BUSY_DAY_WEIGHT,

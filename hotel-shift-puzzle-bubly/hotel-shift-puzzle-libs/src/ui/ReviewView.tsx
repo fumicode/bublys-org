@@ -151,7 +151,7 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
       <section className="e-section">
         <p
           className="e-rule"
-          title="★はその月に無理を引き受けてくれたことを称える数です。★が高い人ほど、翌月の自動シフトで休みを先に置けます（制約欄の「★優先」）"
+          title="貢献度（★）はその月に無理を引き受けてくれたことを称える数です。貢献度が高い人ほど、翌月の自動シフトで休みを先に置けます（制約欄の「貢献度優先」）"
         >
           譲歩1件で★{weightControl("compromise", "譲歩")}・繁忙日1回で★{weightControl("busy", "繁忙日")}
         </p>
@@ -160,7 +160,7 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
           <ReviewMark kind="busy" /> 繁忙日に出勤
         </p>
 
-        {report.stars.length === 0 ? (
+        {report.contributions.length === 0 ? (
           <p className="e-empty">対象スタッフがいません。</p>
         ) : (
           <ul className="e-person-list">
@@ -169,7 +169,7 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
               <span />
               <ReviewDayScale dayCount={dayCount} />
             </li>
-            {report.stars.map((s) => {
+            {report.contributions.map((s) => {
               const expanded = expandedStaffIds.has(s.staffId);
               const hasNote = report.noteFor(s.staffId).trim().length > 0;
               const strip = dayStripOf({

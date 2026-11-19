@@ -5,7 +5,7 @@
  *   勤務表の店舗と年月から決まる（`ConfirmedSchedule.precedingIdFor`）。選ぶことも、紐づけを
  *   持つことも無い。
  * - **引き継いだものは今月の世界に焼き付く。** 写し取るのは確定版の月末の勤務と、振り返りの
- *   ★と、どの版から写したか（{@link PrecedingMonthTail}）。前月の確定版を
+ *   貢献度と、どの版から写したか（{@link PrecedingMonthTail}）。前月の確定版を
  *   後から見に行かない。
  * - **いつ引き継ぐか**：勤務表を作るときに自動で。作った後に前月の確定版が置き換わったり、
  *   前月があとから確定したりしても**勝手には差し替えない**（今月の違反表示や休みの優先順が
@@ -19,7 +19,7 @@ import {
   PrecedingMonthTail,
   ConfirmedSchedule,
   precedingTailLengthFor,
-  type StarEntry,
+  type ContributionEntry,
   type MonthlyStaffSchedule,
   type WorkShiftSet,
 } from "@bublys-org/hotel-shift-puzzle-model";
@@ -64,24 +64,24 @@ export function pendingInheritanceOf(
 }
 
 /**
- * 引き継いだ★の行を返す（純粋）。
+ * 引き継いだ貢献度の行を返す（純粋）。
  *
- * ★は引き継ぎに焼き付いているものを読む。★を写す前に引き継いだ古い勤務表（#231 より前）は
+ * 貢献度は引き継ぎに焼き付いているものを読む。貢献度を写す前に引き継いだ古い勤務表（#231 より前）は
  * 焼き付いていないので、引き継いだ版がいまの確定版と同じときだけそこから読む
  * （版が違えば、今月の前提ではないので読まない）。
  */
 export function inheritedScoresOf(
   inherited: PrecedingMonthTail | undefined,
   confirmed: ConfirmedSchedule | undefined
-): readonly StarEntry[] | undefined {
+): readonly ContributionEntry[] | undefined {
   if (!inherited) return undefined;
-  if (inherited.stars) return inherited.stars;
-  if (confirmed?.isVersion(inherited.source)) return confirmed.stars;
+  if (inherited.contributions) return inherited.contributions;
+  if (confirmed?.isVersion(inherited.source)) return confirmed.contributions;
   return undefined;
 }
 
 /**
- * 前月の確定版（確定ノード時点の勤務表）から、引き継ぐもの（月末の勤務と★）を写し取る。
+ * 前月の確定版（確定ノード時点の勤務表）から、引き継ぐもの（月末の勤務と貢献度）を写し取る。
  * 確定した版がもう読めなければ undefined（＝引き継がない。今月1日から数える）。
  *
  * @param maxConsecutiveWorkdays 今月の連勤上限（何日写せば足りるかを決める）
@@ -116,6 +116,6 @@ export async function captureInheritance(
     schedule,
     shiftNameOf: (shiftId) => workShifts?.findById(shiftId)?.name,
     length: precedingTailLengthFor(maxConsecutiveWorkdays),
-    stars: confirmed.stars,
+    contributions: confirmed.contributions,
   });
 }

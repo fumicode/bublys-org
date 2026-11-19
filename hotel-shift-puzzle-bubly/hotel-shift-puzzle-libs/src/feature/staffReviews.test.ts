@@ -16,7 +16,7 @@ describe('staffReviewSummaries（前月の振り返りからスタッフ分だ�
       storeId: 'store-1',
       compromises: [],
       busyDayContributions: [],
-      stars: (params.scores ?? []).map((s) => ({
+      contributions: (params.scores ?? []).map((s) => ({
         staffId: s.staffId,
         compromiseCount: 0,
         busyDayCount: 0,

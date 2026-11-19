@@ -141,13 +141,13 @@ export const LIMIT_SPECS: LimitSpec[] = [
     caption: "★優先",
     group: "whole",
     kind: "boolean",
-    label: "前月の確定版から引き継いだ★で休みを優先する",
-    read: (set) => set.useStarPriority,
-    apply: (set, v) => set.withUseStarPriority(asBoolean(v)),
+    label: "前月の確定版から引き継いだ貢献度で休みを優先する",
+    read: (set) => set.useContributionPriority,
+    apply: (set, v) => set.withUseContributionPriority(asBoolean(v)),
     describe: (v) =>
       asBoolean(v)
-        ? "前月の確定版から引き継いだ★が高い人ほど、自動シフトで休みを優先して取れる"
-        : "前月の確定版から引き継いだ★は休みの優先度に使わない",
+        ? "前月の確定版から引き継いだ貢献度（★）が高い人ほど、自動シフトで休みを優先して取れる"
+        : "前月の確定版から引き継いだ貢献度は休みの優先度に使わない",
     render: (v, size) => <StarPriorityIcon on={asBoolean(v)} size={size} />,
   },
 ];

@@ -28,7 +28,7 @@ import {
 } from "./scheduleConstraints.js";
 import { autoShiftLimitsOf, runAutoShiftStep } from "./autoShift.js";
 import { inheritedScoresOf, precedingConfirmedOf } from "./precedingMonth.js";
-import { prioritizeStaffByStars } from "./starPriority.js";
+import { prioritizeStaffByContribution } from "./contributionPriority.js";
 import { recordSetCells, recordScheduleMutation } from "./recordScheduleEdit.js";
 import {
   WORKSHIFT_SET_TYPE,
@@ -86,14 +86,14 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
     scheduleId
   );
   // 前月の確定版から引き継いだ★（勤務表に焼き付いている）。
-  // 自動シフトの実行前に staffList をこれで優先度づけする（詳しくは starPriority.ts）。
+  // 自動シフトの実行前に staffList をこれで優先度づけする（詳しくは contributionPriority.ts）。
   const allReports = useObjects<ConfirmedSchedule>(CONFIRMED_SCHEDULE_TYPE);
   const precedingConfirmed = useMemo(
     () => (schedule ? precedingConfirmedOf(allReports, schedule) : undefined),
     [allReports, schedule]
   );
-  // ★は、スイッチ（ConstraintSet.useStarPriority）がオンのときだけ優先度に使う
-  const priorityStars = constraints?.useStarPriority
+  // 貢献度は、スイッチ（ConstraintSet.useContributionPriority）がオンのときだけ優先度に使う
+  const priorityStars = constraints?.useContributionPriority
     ? inheritedScoresOf(schedule?.precedingTail, precedingConfirmed)
     : undefined;
   // 自動シフトが置く休みの目標（月◯日・1日◯人まで）。自動シフトを呼ぶところは必ず丸ごと渡す。
@@ -172,7 +172,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
 
   // 自動シフト：対象スタッフ（subset）だけを staffList として渡す → ステップが subset 限定になる
   const handleRunStep = (step: AutoShiftStep) => {
-    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByStars(
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByContribution(
       subset,
       priorityStars
     );
@@ -196,7 +196,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
   // （たいてい既に開いているため）。
   const handleGenerateCandidates = () => {
     if (!scheduleId) return;
-    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByStars(
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByContribution(
       subset,
       priorityStars
     );
