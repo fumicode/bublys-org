@@ -113,6 +113,9 @@
     },
     {
       "path": "../../bublys-libs/state-management"
+    },
+    {
+      "path": "../../henge-bubly/henge-libs"
     }
   ]
 }

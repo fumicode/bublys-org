@@ -10,6 +10,7 @@ import { MID_MONTH_SCHEDULE_ID, hasSampleFor } from '@bublys-org/hotel-shift-puz
 
 /** 開けるものは**バブリが名乗る**（`bubly.ts`）── 単体でも OS の中でも同じ 1 つ */
 import { menuItems } from "../bubly";
+import { MobileNotice } from './MobileNotice';
 import { useEffect } from 'react';
 import { useAppDispatch, setLightweightMode } from '@bublys-org/state-management';
 
@@ -70,6 +71,8 @@ export function App() {
       urlBinding={makeSnapshotCodec('universe')}
     >
       <SampleWhenEmpty />
+      {/* スマホで初めて開いたときに、PC での作成・編集を勧める（MobileNotice の註） */}
+      <MobileNotice />
       <LightweightByDefault />
       <BublyApp
         title="シフトントン"

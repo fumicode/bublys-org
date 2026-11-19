@@ -5,15 +5,17 @@
  * 縦の“1日”カラムに休みチップ（橙）を積み、上限キャップ線と ≤N を示す。
  */
 import { FC } from "react";
-import { ICON_SIZE } from "./common.js";
+import { ICON_SIZE, IconValueText } from "./common.js";
 
 type Props = {
   max: number;
   /** 1辺のサイズ（px）。バーは既定の80、バブルの図は大きく描く */
   size?: number;
+  /** 渡されたときだけ、図の中の数を押して変えられる（バブルの大きい図） */
+  onCommit?: (value: number) => void;
 };
 
-export const MaxDayOffPerDayIcon: FC<Props> = ({ max, size = ICON_SIZE }) => {
+export const MaxDayOffPerDayIcon: FC<Props> = ({ max, size = ICON_SIZE, onCommit }) => {
   const shown = Math.min(Math.max(0, max), 3);
   return (
     <svg className="e-icon-svg" width={size} height={size} viewBox="0 0 80 80" aria-hidden>
@@ -34,9 +36,7 @@ export const MaxDayOffPerDayIcon: FC<Props> = ({ max, size = ICON_SIZE }) => {
         );
       })}
       {/* 値 */}
-      <text x={40} y={73} fontSize={14} fontWeight={700} fill="#455a64" textAnchor="middle">
-        ≤{max}
-      </text>
+      <IconValueText x={40} y={73} fill="#455a64" prefix="≤" value={max} onCommit={onCommit} />
     </svg>
   );
 };

@@ -35,7 +35,10 @@ export type LimitSpec = {
   group: LimitGroup;
   /** 数で決まるか、入/切で決まるか */
   kind: "number" | "boolean";
-  /** 入力欄のラベルと単位（数のときだけ使う） */
+  /**
+   * 数の前後の言葉（数のときだけ使う）。バブルでは「label N unit」を1文として出す
+   * （例: 連勤は最大 [5] 日まで）。入/切のときは label が入/切の説明
+   */
   label: string;
   unit?: string;
   /** 制約セットから現在の値を読む */
@@ -44,8 +47,15 @@ export type LimitSpec = {
   apply: (set: ConstraintSet, value: number | boolean) => ConstraintSet;
   /** いまの値を1行の日本語にする（ツールチップと図の説明） */
   describe: (value: number | boolean) => string;
-  /** その値の図を描く */
-  render: (value: number | boolean, size?: number) => ReactNode;
+  /**
+   * その値の図を描く。onCommit を渡すと、図の中の数を押してその場で変えられる
+   * （バブルの大きい図だけが渡す。バーの小さいアイコンは読むだけ）。
+   */
+  render: (
+    value: number | boolean,
+    size?: number,
+    onCommit?: (value: number) => void
+  ) => ReactNode;
 };
 
 const asNumber = (v: number | boolean): number => (typeof v === "number" ? v : 0);
@@ -66,7 +76,9 @@ export const LIMIT_SPECS: LimitSpec[] = [
     read: (set) => set.maxDayOffPerDay,
     apply: (set, v) => set.withMaxDayOffPerDay(asNumber(v)),
     describe: (v) => `1日に休めるのは${asNumber(v)}人まで`,
-    render: (v, size) => <MaxDayOffPerDayIcon max={asNumber(v)} size={size} />,
+    render: (v, size, onCommit) => (
+      <MaxDayOffPerDayIcon max={asNumber(v)} size={size} onCommit={onCommit} />
+    ),
   },
   {
     key: "min-monthly-day-off",
@@ -78,7 +90,9 @@ export const LIMIT_SPECS: LimitSpec[] = [
     read: (set) => set.minMonthlyDayOff,
     apply: (set, v) => set.withMinMonthlyDayOff(asNumber(v)),
     describe: (v) => `月に${asNumber(v)}日以上休む`,
-    render: (v, size) => <MinMonthlyDayOffIcon min={asNumber(v)} size={size} />,
+    render: (v, size, onCommit) => (
+      <MinMonthlyDayOffIcon min={asNumber(v)} size={size} onCommit={onCommit} />
+    ),
   },
   {
     key: "max-consecutive-workdays",
@@ -90,7 +104,9 @@ export const LIMIT_SPECS: LimitSpec[] = [
     read: (set) => set.maxConsecutiveWorkdays,
     apply: (set, v) => set.withMaxConsecutiveWorkdays(asNumber(v)),
     describe: (v) => `連勤は最大${asNumber(v)}日まで`,
-    render: (v, size) => <MaxConsecutiveIcon max={asNumber(v)} size={size} />,
+    render: (v, size, onCommit) => (
+      <MaxConsecutiveIcon max={asNumber(v)} size={size} onCommit={onCommit} />
+    ),
   },
   {
     key: "check-allowed-shift",

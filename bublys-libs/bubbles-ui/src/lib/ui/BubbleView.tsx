@@ -18,6 +18,7 @@ import { cornerRadiusFor, type BandSide } from "@bublys-org/bubble-layout-ui";
 import { useHeaderShift } from "../hooks/useHeaderShift.js";
 import { useShowreEdges } from "../showre/ShowreContext.js";
 import { TUBE_THICKNESS } from "../showre/tube.js";
+import { isSmallScreen } from '../utils/narrow-screen.js';
 
 /**
  * 長いslug（UUIDなど）を省略表示する
@@ -182,6 +183,8 @@ const BubbleViewInner: FC<BubbleProps> = ({
     headerSelector: ".e-bubble-header",
     fallbackHeight: 48,
     visible: !docked && isHeaderVisible,
+    // 小さい画面では手前のバブルが画面を使い切るので、ずらさずヘッダーを重ねて出す
+    keepInPlace: pageSize ? isSmallScreen(pageSize) : false,
   });
 
   const isMaximized = bubble.isMaximized;
@@ -785,6 +788,11 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     // 窓型コンテンツ（universeなど）は自前のviewportを持つので、外側の
     // .e-bubble-content はスクロールしない（二重スクロールバーを避ける）。
     overflow: ${({ fillsContainer }) => (fillsContainer ? "hidden" : "auto")};
+    /* 中身を端までスクロールしても、外側（海）へスクロールを伝えない。伝わると、表の端で
+       指やホイールを動かし続けたときに海まで動き、入れ子のスクロールが使いづらくなる。
+       中身がはみ出していないバブルはスクロールできる状態ではないので、その上のホイールは
+       今までどおり海を動かす */
+    overscroll-behavior: contain;
     padding: 16px;
     font-size: 1em;
     background: ${({ lightweightMode, contentBackground }) => lightweightMode

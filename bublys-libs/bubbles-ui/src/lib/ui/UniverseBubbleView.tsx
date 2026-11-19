@@ -17,6 +17,7 @@ import { CloseIcon, ToggleSizeIcon, LayerUpIcon, LayerDownIcon } from "./BubbleI
 import { cornerRadiusFor, type BandSide } from "@bublys-org/bubble-layout-ui";
 import { useHeaderShift } from "../hooks/useHeaderShift.js";
 import { useShowreEdges } from "../showre/ShowreContext.js";
+import { isSmallScreen } from '../utils/narrow-screen.js';
 
 const HEADER_PROXIMITY_THRESHOLD = 40;
 
@@ -133,6 +134,8 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
     headerSelector: ".e-window-header",
     fallbackHeight: 40,
     visible: isHeaderVisible,
+    // 小さい画面では手前のバブルが画面を使い切るので、ずらさずヘッダーを重ねて出す
+    keepInPlace: pageSize ? isSmallScreen(pageSize) : false,
   });
 
   useLayoutEffect(() => {
