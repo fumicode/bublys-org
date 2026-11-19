@@ -12,6 +12,8 @@ import {
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleDayView, dayHeadingLabel } from "../ui/ScheduleDayView.js";
+import { DAY_NOTE_COLOR } from "../ui/schedule-grid/cellSymbols.js";
+import { rokuyoNoteOf } from "./rokuyoNote.js";
 import { useScheduleCandidates } from "./candidates/index.js";
 import { useObjects, useObject } from "../objects/repository.js";
 import { recordSetCell } from "./recordScheduleEdit.js";
@@ -95,6 +97,8 @@ const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({
   // この勤務表で使える勤務帯（勤務表の WorkShiftSet。開始時刻昇順）
   const shiftOptions = workShifts;
 
+  const rokuyo = rokuyoNoteOf(day);
+
   const handleChangeCell = (staffId: string, to: ShiftCell) => {
     recordSetCell(store, { schedule, staffId, day, to });
   };
@@ -102,7 +106,19 @@ const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({
   return (
     <StyledContainer>
       <div className="e-header">
-        <h3>{dayHeadingLabel(day)}</h3>
+        <h3>
+          {dayHeadingLabel(day)}
+          {/* 六曜（#235）。日別のバブルは開いたときに読むものなので、範囲内なら常に添える */}
+          {rokuyo && (
+            <span
+              className="e-day-note"
+              title={rokuyo.title}
+              style={rokuyo.tone ? { color: DAY_NOTE_COLOR[rokuyo.tone] } : undefined}
+            >
+              {rokuyo.label}
+            </span>
+          )}
+        </h3>
       </div>
       <ScheduleDayView
         day={day}
@@ -126,6 +142,13 @@ const StyledContainer = styled.div`
     margin-bottom: 8px;
     h3 {
       margin: 0;
+    }
+    /* 六曜。色はシンボル辞書（DAY_NOTE_COLOR）がインラインで付ける */
+    .e-day-note {
+      margin-left: 8px;
+      font-size: 0.7em;
+      font-weight: normal;
+      color: #999;
     }
   }
 `;
