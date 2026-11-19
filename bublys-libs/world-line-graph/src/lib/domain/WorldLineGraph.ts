@@ -1,11 +1,16 @@
 import { StateRef, stateRefKey } from './StateRef';
-import { WorldNode, createWorldNode } from './WorldNode';
+import { WorldNode, createWorldNode, type CreateWorldNodeOptions } from './WorldNode';
 import { computeStateHash } from './StateHash';
 
 export type ForkChoice = {
   readonly nodeId: string;
   readonly isSameLine: boolean;
   readonly changedRefs: StateRef[];
+};
+
+export type GrowOptions = CreateWorldNodeOptions & {
+  /** true にすると打ち消しスナップ判定をスキップする（中間ステップ用） */
+  skipSnap?: boolean;
 };
 
 export interface WorldLineGraphJson {
@@ -93,15 +98,15 @@ export class WorldLineGraph {
     });
   }
 
-  grow(changedRefs: StateRef[], intentId?: string, intentLabel?: string): WorldLineGraph {
+  grow(changedRefs: StateRef[], options?: GrowOptions): WorldLineGraph {
     const { nodes, rootNodeId } = this.state;
     const apex = this.getApex();
+    const { skipSnap, ...nodeOptions } = options ?? {};
 
     if (!apex) {
       const worldLineId = generateWorldLineId();
-      // root の全体状態 = changedRefs そのもの
       const stateHash = combinedStateHash(refMapOf(changedRefs));
-      const newNode = createWorldNode(null, changedRefs, worldLineId, stateHash, intentId, intentLabel);
+      const newNode = createWorldNode(null, changedRefs, worldLineId, { ...nodeOptions, stateHash });
       return new WorldLineGraph({
         nodes: { ...nodes, [newNode.id]: newNode },
         apexNodeId: newNode.id,
@@ -121,9 +126,12 @@ export class WorldLineGraph {
     //   - 「操作 → 打ち消し → 元の状態」で祖先に戻り、世界線が無駄に伸びない。
     //   - 「打ち消した操作をもう一度」で既存の枝に合流し、重複ノードを作らない。
     // 各ノードに焼いた stateHash と1回比較するだけなので O(祖先数)。
-    const snapTarget = this.findSnapTarget(apex.id, prospectHash);
-    if (snapTarget !== null) {
-      return this.moveTo(snapTarget);
+    // skipSnap: 中間ステップの記録など、意図的にノードを作りたいときはスキップする。
+    if (!skipSnap) {
+      const snapTarget = this.findSnapTarget(apex.id, prospectHash);
+      if (snapTarget !== null) {
+        return this.moveTo(snapTarget);
+      }
     }
 
     const childrenMap = this.getChildrenMap();
@@ -136,7 +144,7 @@ export class WorldLineGraph {
       worldLineId = generateWorldLineId();
     }
 
-    const newNode = createWorldNode(apex.id, changedRefs, worldLineId, prospectHash, intentId, intentLabel);
+    const newNode = createWorldNode(apex.id, changedRefs, worldLineId, { ...nodeOptions, stateHash: prospectHash });
     return new WorldLineGraph({
       nodes: { ...nodes, [newNode.id]: newNode },
       apexNodeId: newNode.id,
@@ -158,7 +166,7 @@ export class WorldLineGraph {
     if (apex && intentId && apex.intentId === intentId && this.isLeaf(apex.id)) {
       return this.amend(changedRefs, intentLabel);
     }
-    return this.grow(changedRefs, intentId ?? undefined, intentLabel);
+    return this.grow(changedRefs, { intentId: intentId ?? undefined, intentLabel });
   }
 
   /** 子を持たない（＝この先に履歴が無い）ノードか */

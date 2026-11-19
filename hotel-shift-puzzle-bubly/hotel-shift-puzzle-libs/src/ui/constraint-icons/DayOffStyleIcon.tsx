@@ -26,13 +26,11 @@ const H = 10;
 const CELL_W = 4;
 const GAP = 1;
 const STROKE = 0.8;
-const DIGIT_W = 5;
 
 export const DayOffStyleIcon: FC<Props> = ({ dayOffStyle, height = H }) => {
   const days = dayOffStyle.isClustered ? CLUSTERED_DAYS : SPREAD_DAYS;
   const stripW = days.length * (CELL_W + GAP) - GAP;
-  const run = dayOffStyle.maxRun === undefined ? "" : String(dayOffStyle.maxRun);
-  const viewW = stripW + (run ? 1 + run.length * DIGIT_W : 0);
+  const viewW = stripW;
   return (
     <svg
       className="e-icon-svg"
@@ -54,19 +52,6 @@ export const DayOffStyleIcon: FC<Props> = ({ dayOffStyle, height = H }) => {
           strokeWidth={STROKE}
         />
       ))}
-      {/* 何連まで（連休型で決まっているときだけ） */}
-      {run && (
-        <text
-          x={viewW}
-          y={H - 1}
-          fontSize={9}
-          fontWeight={700}
-          fill="#2e7d32"
-          textAnchor="end"
-        >
-          {run}
-        </text>
-      )}
     </svg>
   );
 };

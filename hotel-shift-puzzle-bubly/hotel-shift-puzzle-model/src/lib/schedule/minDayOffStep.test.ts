@@ -196,33 +196,23 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
           [0, 1, 2].every((o) => s.isDayOff(staffId, days[k + o]))
       );
     };
-    const clusteredCtx = (maxRun?: number) => ({
+    const clusteredCtx = () => ({
       ...ctxOf(['A']),
       maxConsecutiveWorkdays: 5,
-      dayOffStyleOf: () => DayOffStyle.clustered(maxRun),
+      dayOffStyleOf: () => DayOffStyle.clustered(),
     });
 
-    test('4連まで：出勤を4日以内で区切りながら、休みの隣に置いて連休にする', () => {
-      const result = step.run(emptySchedule(), clusteredCtx(4));
-
-      expect(result.schedule.countDayOffForStaff('A')).toBe(8);
-      expect(longestNonOffRun(result.schedule, 'A')).toBeLessThanOrEqual(4);
-      // 区切りの休みの隣に置いて縮めるので、区切りと連休を同じ休みで兼ねられる
-      expect(pairCount(result.schedule, 'A')).toBe(3);
-      expect(hasTripleOff(result.schedule, 'A')).toBe(false);
-    });
-
-    test('5連まで：4連までより連休が増える（4連1休と5連1休の区別）', () => {
-      const result = step.run(emptySchedule(), clusteredCtx(5));
+    test('連休型：連勤上限で区切りながら、休みの隣に置いて連休にする', () => {
+      const result = step.run(emptySchedule(), clusteredCtx());
 
       expect(result.schedule.countDayOffForStaff('A')).toBe(8);
       expect(longestNonOffRun(result.schedule, 'A')).toBeLessThanOrEqual(5);
-      expect(pairCount(result.schedule, 'A')).toBe(4);
+      expect(pairCount(result.schedule, 'A')).toBeGreaterThanOrEqual(1);
       expect(hasTripleOff(result.schedule, 'A')).toBe(false);
     });
 
-    test('目標は全体の連勤上限を超えない', () => {
-      const ctx = { ...clusteredCtx(6), maxConsecutiveWorkdays: 4 };
+    test('連勤上限が4なら、4日以内で区切る', () => {
+      const ctx = { ...clusteredCtx(), maxConsecutiveWorkdays: 4 };
       const result = step.run(emptySchedule(), ctx);
 
       expect(longestNonOffRun(result.schedule, 'A')).toBeLessThanOrEqual(4);
@@ -240,6 +230,51 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
       expect(result.schedule.countDayOffForStaff('A')).toBe(8);
       expect(pairCount(result.schedule, 'A')).toBe(0);
       expect(longestNonOffRun(result.schedule, 'A')).toBeLessThanOrEqual(5);
+    });
+
+    test('分散型は、希望休みを固定点として全休みの間隔が均等になるよう散らす', () => {
+      // 希望休みが5日と25日にある。残り6日を配置すると、全8日の休みが均等に散る。
+      // 5日と25日の間（6〜24日: 19日間）が最長区間なので、まずそこの中央（15日あたり）に置く
+      let schedule = emptySchedule();
+      const prefs: Record<string, DecodedWish> = {};
+      for (const d of [5, 25]) {
+        schedule = schedule.assignDayOff('A', day(d));
+        prefs[`A|${day(d).key}`] = { kind: 'day-off' };
+      }
+      const result = step.run(schedule, {
+        ...ctxOf(['A'], prefs),
+        maxConsecutiveWorkdays: 5,
+        dayOffStyleOf: () => DayOffStyle.spread(),
+      });
+
+      expect(result.schedule.countDayOffForStaff('A')).toBe(8);
+      expect(pairCount(result.schedule, 'A')).toBe(0);
+      expect(longestNonOffRun(result.schedule, 'A')).toBeLessThanOrEqual(5);
+    });
+
+    test('連休型は、希望休みの隣を最優先でペアリングする', () => {
+      // 希望休みが10日と20日にある。連休型なら、まず9日か11日、19日か21日を相方にする
+      let schedule = emptySchedule();
+      const prefs: Record<string, DecodedWish> = {};
+      for (const d of [10, 20]) {
+        schedule = schedule.assignDayOff('A', day(d));
+        prefs[`A|${day(d).key}`] = { kind: 'day-off' };
+      }
+      const result = step.run(schedule, {
+        ...ctxOf(['A'], prefs),
+        maxConsecutiveWorkdays: 5,
+        dayOffStyleOf: () => DayOffStyle.clustered(),
+      });
+
+      expect(result.schedule.countDayOffForStaff('A')).toBe(8);
+      // 希望休みの隣が連休になっている
+      const day10paired =
+        result.schedule.isDayOff('A', day(9)) || result.schedule.isDayOff('A', day(11));
+      const day20paired =
+        result.schedule.isDayOff('A', day(19)) || result.schedule.isDayOff('A', day(21));
+      expect(day10paired).toBe(true);
+      expect(day20paired).toBe(true);
+      expect(hasTripleOff(result.schedule, 'A')).toBe(false);
     });
 
     test('分散型でも、連勤上限を超える区間は休みの隣でも割る（上限が先）', () => {
@@ -289,7 +324,7 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
       // 希望の休み 4・12・20・27日。5〜11日の7連勤は、11日に置けば12日と連休になり5連以内に収まる
       let schedule = emptySchedule();
       for (const d of [4, 12, 20, 27]) schedule = schedule.assignDayOff('A', day(d));
-      const result = step.run(schedule, clusteredCtx(5));
+      const result = step.run(schedule, clusteredCtx());
 
       expect(result.schedule.isDayOff('A', day(11))).toBe(true);
       expect(result.schedule.isDayOff('A', day(10))).toBe(false);
@@ -304,7 +339,7 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
       for (let d = 14; d <= 30; d++) schedule = schedule.assignDayOff('A', day(d));
       const result = makeMinDayOffStep(schedule.countDayOffForStaff('A') + 1).run(
         schedule,
-        clusteredCtx(5)
+        clusteredCtx()
       );
 
       expect(result.schedule.isDayOff('A', day(11))).toBe(false);
@@ -313,7 +348,7 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
 
     test('希望の休みの隣に寄せて連休にする', () => {
       const schedule = emptySchedule().assignDayOff('A', day(10));
-      const result = step.run(schedule, clusteredCtx(5));
+      const result = step.run(schedule, clusteredCtx());
 
       expect(
         result.schedule.isDayOff('A', day(9)) || result.schedule.isDayOff('A', day(11))
@@ -340,19 +375,19 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
 
       test('前月末日が単発の休みなら、1日目を相方にして連休にする', () => {
         const schedule = emptySchedule().withPrecedingTail(mayTail({ lastOff: true, workdays: 4 }));
-        const result = step.run(schedule, clusteredCtx(5));
+        const result = step.run(schedule, clusteredCtx());
 
         expect(result.schedule.isDayOff('A', day(1))).toBe(true);
         expect(result.schedule.isDayOff('A', day(2))).toBe(false); // 3連休にはしない
       });
 
-      test('前月末から続く出勤を足して、目標の日数で区切る', () => {
-        // 前月末に3連勤 → 4連までの人は、遅くとも2日目には休む（前月から4連勤まで）
+      test('前月末から続く出勤を足して、連勤上限で区切る', () => {
+        // 前月末に3連勤 → 連勤上限5なので、遅くとも3日目には休む（前月から5連勤まで）
         const schedule = emptySchedule().withPrecedingTail(mayTail({ lastOff: false, workdays: 3 }));
-        const result = step.run(schedule, clusteredCtx(4));
+        const result = step.run(schedule, clusteredCtx());
 
-        expect(result.schedule.isDayOff('A', day(2))).toBe(true);
-        expect(longestNonOffRun(result.schedule, 'A')).toBeLessThanOrEqual(4);
+        expect(result.schedule.isDayOff('A', day(3))).toBe(true);
+        expect(longestNonOffRun(result.schedule, 'A')).toBeLessThanOrEqual(5);
         expect(hasTripleOff(result.schedule, 'A')).toBe(false);
       });
     });

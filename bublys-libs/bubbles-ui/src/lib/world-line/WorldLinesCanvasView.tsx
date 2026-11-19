@@ -1,6 +1,13 @@
 "use client";
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorldLineGraph } from "@bublys-org/world-line-graph";
+import {
+  type FoldState,
+  type FoldedGraphData,
+  type FoldGroupInfo,
+  buildFoldedGraphData,
+  buildFoldedChildrenMap,
+} from "./commandFold.js";
 
 /**
  * world-line グラフを canvas に「左→右に流れ、分岐は下に伸びる木」として描く純粋ビュー。
@@ -34,9 +41,13 @@ export type WorldLinesCanvasViewProps = {
   onApexScreenPos?: (pos: { x: number; y: number } | null) => void;
   /** 背景色（任意。デフォルト透明）。 */
   background?: string;
+  /** 折りたたみ状態。未指定なら全ノード表示（従来どおり）。 */
+  foldState?: FoldState;
+  /** 折りたたみ済みノードをクリックしたとき呼ばれる。 */
+  onToggleFold?: (commandGroupId: string) => void;
 };
 
-type NodePos = { x: number; y: number; color: string };
+type NodePos = { x: number; y: number; color: string; foldInfo?: FoldGroupInfo };
 type Layout = {
   /** world 座標でのノード位置（0,0 起点） */
   nodes: Map<string, NodePos>;
@@ -76,15 +87,18 @@ const COLOR_PALETTE = [
   "#ff8a65",
 ];
 
-function computeLayout(graph: WorldLineGraph): Layout {
+function computeLayout(graph: WorldLineGraph, foldedData?: FoldedGraphData): Layout {
   const { nodes, rootNodeId } = graph.state;
   if (!rootNodeId || !nodes[rootNodeId]) {
     return { nodes: new Map(), edges: [], maxX: 0, maxY: 0 };
   }
 
-  const childrenMap = graph.getChildrenMap();
+  const rawChildrenMap = graph.getChildrenMap();
+  const effectiveChildrenMap = foldedData
+    ? buildFoldedChildrenMap(rawChildrenMap, foldedData)
+    : rawChildrenMap;
 
-  // worldLineId → 色割り当て
+  // worldLineId → 色割り当て（全ノードから。折りたたまれたノードも色の種類に数える）
   const wlColors = new Map<string, string>();
   let colorIdx = 0;
   for (const node of Object.values(nodes)) {
@@ -102,12 +116,14 @@ function computeLayout(graph: WorldLineGraph): Layout {
   const visit = (nodeId: string, depth: number, row: number) => {
     const node = nodes[nodeId];
     if (!node || positions.has(nodeId)) return;
+    if (foldedData && !foldedData.visibleNodeIds.has(nodeId)) return;
     positions.set(nodeId, {
       x: depth * COL_DX,
       y: row * ROW_DY,
       color: wlColors.get(node.worldLineId) ?? "#888",
+      foldInfo: foldedData?.groupInfoByRepId.get(nodeId),
     });
-    const children = childrenMap[nodeId] ?? [];
+    const children = effectiveChildrenMap[nodeId] ?? [];
     children.forEach((cid, i) => {
       edges.push({ from: nodeId, to: cid });
       const childRow = i === 0 ? row : ++nextRow;
@@ -206,10 +222,10 @@ function draw(
     ctx.fillRect(0, 0, vw, vh);
   }
 
-  const screen = new Map<string, { sx: number; sy: number; scale: number; color: string }>();
+  const screen = new Map<string, { sx: number; sy: number; scale: number; color: string; foldInfo?: FoldGroupInfo }>();
   for (const [id, pos] of layout.nodes) {
     const p = project(pos.x, pos.y);
-    screen.set(id, { ...p, color: pos.color });
+    screen.set(id, { ...p, color: pos.color, foldInfo: pos.foldInfo });
   }
 
   // edges（ノードより先に描いて下に敷く）
@@ -240,17 +256,17 @@ function draw(
   for (const [id, s] of screen) {
     if (s.sx < -40 || s.sx > vw + 40 || s.sy < -40 || s.sy > vh + 40) continue;
     const isApex = id === apexNodeId;
-    const r = NODE_RADIUS * s.scale;
+    const isFolded = !!s.foldInfo;
+    const r = (isFolded ? NODE_RADIUS * 1.4 : NODE_RADIUS) * s.scale;
     ctx.beginPath();
     ctx.arc(s.sx, s.sy, r, 0, Math.PI * 2);
-    ctx.fillStyle = isApex ? s.color : "rgba(20,22,30,0.85)";
+    ctx.fillStyle = isApex ? s.color : isFolded ? "rgba(40,44,60,0.9)" : "rgba(20,22,30,0.85)";
     ctx.fill();
     ctx.strokeStyle = s.color;
-    ctx.lineWidth = (isApex ? 2.6 : 1.6) * Math.max(0.6, s.scale);
+    ctx.lineWidth = (isApex ? 2.6 : isFolded ? 2.2 : 1.6) * Math.max(0.6, s.scale);
     ctx.stroke();
 
     if (isApex) {
-      // apex を二重リングで強調
       ctx.beginPath();
       ctx.arc(s.sx, s.sy, r + 3.5, 0, Math.PI * 2);
       ctx.strokeStyle = s.color;
@@ -258,6 +274,16 @@ function draw(
       ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.globalAlpha = 1;
+    }
+
+    if (isFolded && s.scale >= 0.35) {
+      const count = s.foldInfo!.nodeCount;
+      const badge = `×${count}`;
+      const fontSize = Math.max(8, Math.round(9 * s.scale));
+      ctx.font = `bold ${fontSize}px ui-sans-serif, -apple-system, sans-serif`;
+      ctx.fillStyle = "rgba(235,240,255,0.9)";
+      ctx.textAlign = "center";
+      ctx.fillText(badge, s.sx, s.sy + 1);
     }
 
   }
@@ -315,13 +341,28 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
   onSelectNode,
   onApexScreenPos,
   background,
+  foldState,
+  onToggleFold,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState({ w: 1, h: 1 });
 
-  // 同じ state なら layout を再利用
-  const layout = useMemo(() => computeLayout(graph), [graph.state]);
+  const foldedData = useMemo(
+    () =>
+      foldState
+        ? buildFoldedGraphData(
+            graph.state.nodes,
+            graph.getChildrenMap(),
+            foldState
+          )
+        : undefined,
+    [graph.state, foldState]
+  );
+  const layout = useMemo(
+    () => computeLayout(graph, foldedData),
+    [graph.state, foldedData]
+  );
   const labelize = getNodeLabel ?? ((_: string) => "");
 
   // フォーカス（ビューポート中央に来る world 座標）。current を target へ追従させる。
@@ -575,6 +616,7 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
   }, []);
 
   // クリック（動かしていなければ、押した所のノードを選ぶ）
+  // 折りたたみ済みノードの場合は展開する（moveTo の代わり）。
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       const d = drag.current;
@@ -583,9 +625,15 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
       const p = pointOf(e);
       if (!p) return;
       const bestId = nodeAt(p.px, p.py, p.w, p.h);
-      if (bestId) onSelectNode(bestId);
+      if (!bestId) return;
+      const fi = layoutRef.current.nodes.get(bestId)?.foldInfo;
+      if (fi && onToggleFold) {
+        onToggleFold(fi.commandGroupId);
+      } else {
+        onSelectNode(bestId);
+      }
     },
-    [pointOf, nodeAt, onSelectNode],
+    [pointOf, nodeAt, onSelectNode, onToggleFold],
   );
 
   useEffect(() => () => {
