@@ -13,6 +13,11 @@ import { useLayoutEffect, useRef, useState } from "react";
  *     下ろす（`headerDrop`）。バブルは画面の外へ流れてよいが、掴む所は見えていてほしい。
  *     下ろせるのはバブルの下端まで ── 下端まで画面の外へ出たら、ヘッダーも一緒に出ていく
  *
+ * 小さい画面（スマホ）では 1 を使わない（`keepInPlace`）。手前のバブルが画面を使い切るので、
+ * 上に出す場所が無い。ずらすとバブルの下端が画面の外（メニューの帯の裏）へ押し出され、
+ * ヘッダーを出し入れするたびにバブルが上下に跳ねる（指で触るたびに出入りするので、震えて見えた）。
+ * そのときは 3 だけが効き、ヘッダーはバブルに重ねて出る。
+ *
  * だから「ずらす量」は出した瞬間に測り直す。mousemove のような別のきっかけに頼ると、
  * バーだけ出て押し下げが 0 のまま（＝バーが画面の外）という食い違いが起きる。
  * 岸に着いていても海に浮いていても、入れ子の中でも、同じ計算でよい。
@@ -25,12 +30,20 @@ type UseHeaderShiftArgs = {
   fallbackHeight: number;
   /** ヘッダーを出しているか。出していない間はずらさない（辺にくっつく） */
   visible: boolean;
+  /** バブルをずらさない（小さい画面）。ヘッダーは見えている範囲に収まるよう、バブルに重ねて出す */
+  keepInPlace?: boolean;
 };
 
 /** これ未満の差は「同じ」とみなす（実測のサブピクセル揺れで回り続けないように） */
 const SHIFT_EPSILON = 0.5;
 
-export function useHeaderShift({ ref, headerSelector, fallbackHeight, visible }: UseHeaderShiftArgs) {
+export function useHeaderShift({
+  ref,
+  headerSelector,
+  fallbackHeight,
+  visible,
+  keepInPlace = false,
+}: UseHeaderShiftArgs) {
   const [shift, setShift] = useState(0);
   const shiftRef = useRef(shift);
   shiftRef.current = shift;
@@ -87,7 +100,7 @@ export function useHeaderShift({ ref, headerSelector, fallbackHeight, visible }:
     const headerHeight = headerHeightNow();
     // いまずれているぶんを引いて、素の位置で測る
     const rawTop = bubbleRect.top - appliedShift();
-    const next = Math.max(0, topBound() - (rawTop - headerHeight));
+    const next = keepInPlace ? 0 : Math.max(0, topBound() - (rawTop - headerHeight));
     if (!Number.isFinite(next)) return;
     // ★ サブピクセルの差では動かさない。
     //   実測は毎回わずかに違う値（48.3984375 と 48.39843814697266 など）を返すので、
