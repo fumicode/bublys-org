@@ -10,7 +10,7 @@
  *   「スライスは集約のリポジトリに徹する」に沿うなら、載せるのは `WorldState` 丸ごと1つ。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, DragEvent as ReactDragEvent, ReactNode } from 'react';
+import type { CSSProperties, DragEvent as ReactDragEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { Bubble, BubbleWorld, actContext, dragBubble, emptyWorld, fitsParallel, presetView, renumber, reshape, resolveRules, resolveWorld, stripChrome, viewOfSpace, withAxis, withPreset, CHROME, METRICS} from '@bublys-org/bubble-layout';
 import type { AxisView, BubbleId, Chrome, ChromeId, LayoutRules, LensId, PlaneAxis, PresetId, View, Viewport } from '@bublys-org/bubble-layout';
 import { BubbleField, BubbleShell, FIELD_CSS, MARKS_CSS, useBubbleInput } from '@bublys-org/bubble-layout-ui';
@@ -23,6 +23,40 @@ import { FollowIcon, PinIcon, VIEW_CHOICES } from './ViewIcons.js';
 import type { BubbleRoute, RoutedBubble } from './routing.js';
 import { hueOf, openAt } from './openAt.js';
 import { SPACE_CSS } from './space-css.js';
+import { BUBBLE_SKIN_CSS } from './skin-css.js';
+import { getObjectTypeIcon, objectTypeOfUrl } from '@bublys-org/object-types';
+import { UrlLink } from './UrlLink.js';
+import { burstFrom } from './popEffect.js';
+
+/**
+ * **器の CSS は段（`@layer bl`）に入れる。**
+ *
+ * > 器は中身に勝てない。器の中では、ラボ → 印 → 器 → 皮 の順に上から塗る。
+ *
+ * ★ 段に入っていない CSS（中身の styled-components・MUI）は、詳細度に関係なく
+ *   必ず段に勝つ。器が中身の見た目を上書きしてしまうことが、これで起きなくなる。
+ * ★ 上書きの順を、文字列を足す順番ではなく**段の名前**で言う。
+ * ★ アプリ側の素の CSS（modern-normalize など）も段に入っていないと器に勝つので、
+ *   アプリは `@layer reset, bl;` を宣言して、それを `reset` に入れること
+ *   （apps/travel-space・apps/bublys-os の global.css）。
+ */
+const FRAME_CSS = `@layer bl{
+@layer field, marks, space, skin;
+@layer field{${FIELD_CSS}}
+@layer marks{${MARKS_CSS}}
+@layer space{${SPACE_CSS}}
+@layer skin{${BUBBLE_SKIN_CSS}}
+}`;
+
+/**
+ * **海のモード。**
+ *
+ * - `use`  … 使う。中身を触れる。掴めるのは枠だけ（今まで）
+ * - `wind` … 風。泡を吹いて並べる。どの泡も全面で掴め、中身には触れない。カーソルに羽
+ * - `needle` … 針。**× を押したまま引いている間だけ**。どの泡にも急所が出て、筆跡が急所を
+ *   通った泡が割れる。離したら終わり（使うに戻る）。カーソルに針
+ */
+export type SeaMode = 'use' | 'wind' | 'needle';
 
 /**
  * 並べ方の口を、箱の中のどこに置くか（左端からのずれ）。
@@ -369,18 +403,6 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   const noteListHost = useCallback((id: BubbleId) => {
     setListHosts((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
   }, []);
-  /**
-   * **中に空間を持っている泡**（`setChildren` を呼んだ泡ぜんぶ）。一覧かどうかは問わない。
-   *
-   * ★ 前は一覧の棚 1 つで、**見え方の口を出すこと**と**札を静かにすること**（＝帯を外して
-   *   掴めなくすること）の両方が決まっていた。だから座標を自分で書く空間が
-   *   「一覧ではない」と名乗ると、口まで消えて**見え方を変える手が無くなった**（実測で言われた）。
-   * ★ 2 つは別の話なので、棚も 2 つに分ける ── 口はここ、札の静かさは `listHosts`。
-   */
-  const [spaceHosts, setSpaceHosts] = useState<ReadonlySet<BubbleId>>(() => new Set());
-  const noteSpaceHost = useCallback((id: BubbleId) => {
-    setSpaceHosts((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
-  }, []);
 
   // url と種類は domain に入れない（「泡に url を持たせるか」は未決）。ここで id との対で持つ
   const [urls, setUrls] = useState<ReadonlyMap<BubbleId, Opened>>(() => remembered?.urls ?? new Map());
@@ -388,6 +410,24 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     () => remembered?.world ?? emptyWorld(presetView(props.rootPreset ?? 'free')),
   );
   const [selectedId, setSelectedId] = useState<BubbleId | null>(null);
+  /**
+   * **海のモード** ── いま押す・掴む・離すが何を意味するか（{@link SeaMode}）。
+   *
+   * > 海はいつも 1 つのモードに居る。モードは手つきから読み取り、カーソルが教える。
+   *
+   * ★ ボタンは置かない。泡を掴んで動かしたら「風」に入り、泡を触ったら（動かさずに離したら）
+   *   「使う」に戻る。迷ったら Esc ── どのモードからでも「使う」に戻る。
+   * ★ 背景を押して離しても戻る（引かずに離したとき）。背景を引いて見回すのは、風のまま。
+   * ★ 海ごと（この `BubbleSpace` ごと）に 1 つ。窓の中の海は自分のモードを持つ。
+   * ★ 世界線には残さない。選んでいる泡と同じく「いま何をしているか」の話なので。
+   */
+  const [mode, setMode] = useState<SeaMode>('use');
+  useEffect(() => {
+    if (mode === 'use') return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMode('use'); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mode]);
 
   const world = props.world ?? ownWorld;
   /**
@@ -584,9 +624,24 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     [world, viewport, rules, chrome, nudge, dressed],
   );
 
+  /**
+   * **この海から出て行った札**（岸に貼った・外へ渡した）を、出した空間ごとに控える。
+   *
+   * ★ 出て行くと世界からも覚え書きからも消えるので、あとから「居ない」としか分からない
+   *   ── それだと顔ぶれを言い切っている空間が**毎回生やし直す**。
+   * ★ 戻ってくれば（同じ url が子として現れれば）控えは消す。
+   */
+  const gone = useRef<Map<BubbleId, Set<string>>>(new Map());
+
   /** 海から出す（岸へ渡す）。泡も url の覚えも落とす */
   const takeOut = useCallback(
     (id: BubbleId) => {
+      const opened = urls.get(id);
+      if (opened?.originId) {
+        const set = gone.current.get(opened.originId) ?? new Set<string>();
+        set.add(opened.url);
+        gone.current.set(opened.originId, set);
+      }
       setWorld(world.without(id));
       setUrls((m) => {
         const next = new Map(m);
@@ -596,7 +651,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       // 岸へ出て行くのも**顔ぶれの変化**（受け取ったのが誰かは、海の関心ではない）
       markSettled('members');
     },
-    [world, setWorld, markSettled],
+    [world, setWorld, markSettled, urls],
   );
 
   const claimDrop = useCallback(
@@ -716,6 +771,75 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   );
 
   /**
+   * **針** ── × を押したまま引いている間だけ持つ。筆跡が急所を通った泡が割れる。
+   *
+   * > 割れるのは急所を通った泡だけ。泡の上を通っても、急所を外れれば割れない。
+   *
+   * ★ 割る泡は**列に積んで 1 つずつ**閉じる。`closeBubble` は描いた時点の世界から次の姿を作るので、
+   *   1 回の動きで 2 つ通ったときに続けて呼ぶと、2 つ目が 1 つ目を上書きする。
+   * ★ 筆跡は前の点から今の点までを細かくたどって当てる ── 速く引いても急所を飛び越さない。
+   * ★ 当てるのは**自分の層の泡の急所だけ**（窓の中の海の急所は、窓の外からは触れない）。
+   * ★ 引き始めた × の泡も、ほかの泡と同じ決まり ── 急所を通れば割れる、通らなければ割れない。
+   *   急所は × のすぐ下にあるので、割りたくなければ × から急所を避けて引き出す。
+   */
+  const [popQueue, setPopQueue] = useState<readonly BubbleId[]>([]);
+  useEffect(() => {
+    if (!popQueue.length) return;
+    const [id, ...rest] = popQueue;
+    if (urls.has(id)) closeBubble(id);
+    setPopQueue(rest);
+    // 1 つ閉じて描き直すたびに次へ（閉じる口は、その時の世界で作り直されている）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [popQueue]);
+  const popAlong = useCallback((x0: number, y0: number, x1: number, y1: number, popped: Set<BubbleId>) => {
+    const layer = layerRef.current;
+    if (!layer) return;
+    const hits: BubbleId[] = [];
+    const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 4));
+    for (let i = 0; i <= n; i++) {
+      const el = document.elementFromPoint(x0 + ((x1 - x0) * i) / n, y0 + ((y1 - y0) * i) / n);
+      const spot = el?.closest('.bl-spot') as HTMLElement | null | undefined;
+      const bub = spot?.parentElement;
+      if (!spot || !bub || bub.parentElement?.parentElement !== layer) continue;
+      const id = bub.dataset.id as BubbleId | undefined;
+      if (!id || popped.has(id)) continue;
+      popped.add(id);
+      hits.push(id);
+      // 急所からはじける（写しに絵を付ける ── 泡そのものは列が閉じる）
+      burstFrom(bub, spot);
+    }
+    if (hits.length) setPopQueue((q) => [...q, ...hits]);
+  }, []);
+  /** × を押した ── 引けば針、引かずに離せばいつもの「閉じる」（click が拾う） */
+  const needleDragged = useRef(false);
+  const armNeedle = useCallback((e: ReactPointerEvent) => {
+    if (e.button !== 0) return;
+    needleDragged.current = false;
+    const x0 = e.clientX, y0 = e.clientY;
+    let last: { x: number; y: number } | null = null;
+    const popped = new Set<BubbleId>();
+    const ctrl = new AbortController();
+    const end = () => {
+      ctrl.abort();
+      if (last) setMode('use');
+    };
+    window.addEventListener('pointermove', (ev) => {
+      if (!last) {
+        if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 3) return;
+        // 引いた ＝ 針を持った。ここから先の × の click は閉じない
+        needleDragged.current = true;
+        setMode('needle');
+        last = { x: x0, y: y0 };
+      }
+      popAlong(last.x, last.y, ev.clientX, ev.clientY, popped);
+      last = { x: ev.clientX, y: ev.clientY };
+    }, { signal: ctrl.signal });
+    window.addEventListener('pointerup', end, { signal: ctrl.signal });
+    window.addEventListener('pointercancel', end, { signal: ctrl.signal });
+    window.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') end(); }, { signal: ctrl.signal });
+  }, [popAlong]);
+
+  /**
    * **並びごと閉じる。**
    *
    * ★ くっつけて 1 つの塊にしたものは、**畳むときも塊で畳みたい**
@@ -772,23 +896,12 @@ export function BubbleSpace(props: BubbleSpaceProps) {
    *   （戻った先で分岐が 1 つ増える）。
    */
   const setLens = useCallback(
-    (axis: PlaneAxis, lens: LensId, spaceId: BubbleId = 'root') => {
-      /** ★ 外の海なら今までどおり。**中の空間なら、その空間の軸だけ**を変える */
-      if (spaceId === 'root') applyLens(axis, lens);
-      else setWorld(withAxis(world, spaceId, axis, { lens }));
+    (axis: PlaneAxis, lens: LensId) => {
+      applyLens(axis, lens);
       markSettled('view');
     },
-    [applyLens, markSettled, world, setWorld],
+    [applyLens, markSettled],
   );
-
-  /**
-   * その空間の、いまの見え方（無ければ null）。
-   *
-   * ★ 見え方の口を**外の器が作る**のに要る ── 口の中身（`SpaceViewTools`）は
-   *   海の口と同じ見本から出したいが、あれは上の層に居るので、
-   *   ここからは「読む口」と「書く口」を渡すだけにする。
-   */
-  const viewOf = useCallback((spaceId: BubbleId) => world.ownViewOf(spaceId), [world]);
 
   /**
    * 岸から海へ返す。置いたあと、**画面のその矩形に見えるように**動かす
@@ -904,13 +1017,14 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   const setChildren = useCallback(
     (hostId: BubbleId, want: readonly string[], how: ChildrenLayout = {}) => {
       const { preset, itemWidth, reserve, step, cols, grow, at, list, onLeave } = how;
-      /** ★ 中に空間を持つ泡として覚えるのは、一覧でもそうでなくても（見え方の口はどちらにも要る） */
-      noteSpaceHost(hostId);
       /** ★ 一覧ではない空間（座標を自分で書く場）は、一覧として覚えない（`list` の註） */
       if (list !== false) noteListHost(hostId);
       const kids = world.kidsOf(hostId);
       const urlOfKid = (id: BubbleId) => urls.get(id)?.url;
       const have = new Set(kids.map((k) => urlOfKid(k.id)).filter(Boolean) as string[]);
+      /** ★ 戻ってきた札の控えは消す（人が岸から海へ返したとき） */
+      const back = gone.current.get(hostId);
+      if (back) for (const url of have) back.delete(url);
       /**
        * ★ **作れないものは「足りない」に数えない。** ルートの無い url は下の作る所で
        *   飛ばされるので、数えたままだと「足りないまま」が永遠に続き、**同じ世界を
@@ -931,7 +1045,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        *   （`onLeave` の註）。伝えたぶんは、この回は生やさない ── 生やしてから
        *   消すと、1 回ぶん画面がちらつく。
        */
-      const left = new Map<string, { space: BubbleId; beside: boolean }>();
+      const left = new Map<string, { space: BubbleId | null; beside: boolean }>();
       /** 一覧自身が居る空間。ここへ出されたのが「隣に剥がした」 */
       const mySpace = world.bubble(hostId)?.space ?? 'root';
       for (const [id, opened] of urls) {
@@ -941,10 +1055,29 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         if (!want.includes(opened.url)) continue;
         left.set(opened.url, { space: here.space, beside: here.space === mySpace });
       }
+      /**
+       * ★ **海から出て行ったものも数える**（岸に貼った・外へ渡した）。
+       *   あちらは世界から消えるので上の見回りでは掴めない ── 出したときに控えておく。
+       *   これが無いと、**岸に貼った瞬間に海へ生え直して二重になる**。
+       */
+      const goneHere = gone.current.get(hostId);
+      if (goneHere) {
+        for (const url of goneHere) if (want.includes(url) && !have.has(url)) left.set(url, { space: null, beside: false });
+      }
       if (onLeave) for (const [url, at] of left) onLeave(url, at);
 
+      /**
+       * ★ **連れ戻すかどうかは、持ち主が決める。**
+       *
+       * 出て行ったことは伝える（`onLeave`）が、顔ぶれ（`want`）から外すかどうかは
+       * 持ち主の仕事。ここで勝手に外すと、**外の海へ持ち出しただけ**のときにも
+       * 一覧から減ってしまう ── ほかの一覧の決まり（「外に 1 つ増えるだけで、
+       * ここからは減らない」）が壊れる。
+       * ★ 海から出て行ったもの（岸）だけは、持ち主が外すまでのあいだ生やさない
+       *   ── 貼った先から毎回引き剥がすことになるので。
+       */
       const missing = want.filter(
-        (url) => !have.has(url) && !left.has(url) && !!matchBubbleRoute(routes, url),
+        (url) => !have.has(url) && !goneHere?.has(url) && !!matchBubbleRoute(routes, url),
       );
       const extra = kids.filter((k) => { const u = urlOfKid(k.id); return !u || !want.includes(u); }).map((k) => k.id);
       /**
@@ -1077,7 +1210,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       setUrls(m);
       setWorld(w);
     },
-    [world, urls, routes, setWorld, noteListHost, noteSpaceHost],
+    [world, urls, routes, setWorld, noteListHost],
   );
 
   /** その泡が入っている空間（＝ 親の泡）。子から「外へ開く」ときに要る */
@@ -1200,9 +1333,8 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   }, [autoLens, base, world, applyLens]);
 
   const api: BubbleSpaceApi = useMemo(
-    () => ({ snapshot, restore, openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn,
-      hasSpace: (id: BubbleId) => spaceHosts.has(id), isList: (id: BubbleId) => listHosts.has(id), viewOf }),
-    [snapshot, restore, openBubble, closeBubble, urls, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn, spaceHosts, listHosts, viewOf],
+    () => ({ snapshot, restore, openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn }),
+    [snapshot, restore, openBubble, closeBubble, urls, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn],
   );
 
   /**
@@ -1268,6 +1400,12 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     zoom: screen.zoom, setZoom: screen.setZoom, onOverscroll: overscroll,
     /** 動かし終え・広げ終えたときに 1 つ（途中の 1px ごとには出さない ── `SettleWhy` の註） */
     onSettled: () => markSettled('moved'),
+    // 風の間は、どの泡も全面が枠（中身へは手が届かない ── 届かなくするのは CSS の `.bl-wind`）
+    wholeGrab: mode !== 'use',
+    // 泡を掴んで動かした ＝ 並べたい。触った ＝ 使いたい
+    onGrabStart: () => setMode('wind'),
+    onTap: () => setMode('use'),
+    onBackgroundTap: () => setMode('use'),
   });
 
   const headerTools = props.headerTools;
@@ -1324,21 +1462,35 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        *   札の中身ではないので、入らないぶんは切る。
        */
       const deep = inList && !packed;
+      /** 何の型の泡か（無ければ url を出す） */
+      const kind = objectTypeOfUrl(url);
       return (
         <>
+          {/* 膜の板。皮（skin-css）が泡の地をここに描いて、出し入れする。皮が無ければ出ない */}
+          <div className="bl-film" />
           <div className="hd" />
           {/*
-            ★ 枠に出すのは **url**（題名ではない）。既存 bubbles-ui の泡と同じ。
+            ★ 枠に出すのは **何の型の泡か**（題名ではない）。
               中身は自分の題名を自分で出すので、枠にも題名を出すと二重になる
               ── v6 の検証で最初に見つかったのがこれ。
+            ★ 型は url から割り出す（`objectTypeOfUrl`：開く先を逆に読む）。
+              どの型の開く先でもない泡（地図・ランチャー）は、今までどおり url を出す。
           */}
           <div className={'ttl bl-url' + (inList ? ' bl-quiet' : '')}>
-            {url.split("/").map((seg, i) => (
-              <span key={i} className="bl-seg">
-                {i > 0 && <span className="bl-sep">/</span>}
-                {seg}
+            {kind ? (
+              <span className="bl-kind">
+                <span className="bl-kind-icon">{getObjectTypeIcon(kind.kind)}</span>
+                {kind.type}
+                {kind.list && <span className="bl-kind-list"> の一覧</span>}
               </span>
-            ))}
+            ) : (
+              url.split("/").map((seg, i) => (
+                <span key={i} className="bl-seg">
+                  {i > 0 && <span className="bl-sep">/</span>}
+                  {seg}
+                </span>
+              ))
+            )}
           </div>
           {/*
             ★ **中に空間を持つ泡には、見え方の口を枠の上に出す**（仮の置き場所）。
@@ -1421,12 +1573,15 @@ export function BubbleSpace(props: BubbleSpaceProps) {
             )}
           </div>
           {r && headerTools?.(r.bubble, r.route)}
+          <UrlLink url={url} />
           <button
             className="bl-close"
-            title="閉じる"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={() => closeBubble(id)}
+            title="閉じる（押したまま引くと針 ── 急所を通った泡が割れる）"
+            onPointerDown={(e) => { e.stopPropagation(); armNeedle(e); }}
+            onClick={() => { if (!needleDragged.current) closeBubble(id); needleDragged.current = false; }}
           >×</button>
+          {/* 急所 ── 針を持っている間だけ出る（CSS の .bl-needle）。一覧の札には出さない */}
+          {!inList && <div className="bl-spot" />}
           <div
             className={
               'bl-body' +
@@ -1449,7 +1604,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         </>
       );
     },
-    [routes, urls, closeBubble, closeRow, world, chrome, headerTools, frameTools, viewChoice, listHosts, spaceHosts],
+    [routes, urls, closeBubble, closeRow, armNeedle, world, chrome, headerTools, frameTools, viewChoice, listHosts],
   );
 
   /** 宇宙に落とす ── ダブルクリックと同じ道（`openBubble` の元が違うだけ） */
@@ -1469,7 +1624,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       <ViewChoiceContext.Provider value={viewChoice}>
       <ScreenZoomContext.Provider value={screen}>
       <SelectedBubbleContext.Provider value={selectedId}>
-      <style>{FIELD_CSS + MARKS_CSS + SPACE_CSS}</style>
+      <style>{FRAME_CSS}</style>
       <div
         className={'bl-space' + (className ? ' ' + className : '')}
         style={{ position: 'relative', width: viewport.w, height: viewport.h, overflow: 'hidden', ...style }}
@@ -1493,6 +1648,8 @@ export function BubbleSpace(props: BubbleSpaceProps) {
           marks={input.marks}
           layerRef={layerRef}
           renderBubble={renderBubble}
+          /** モードは層の印で言う ── 中身へ手を届かせない・カーソル・膜は CSS がこれを読む */
+          className={mode === 'use' ? undefined : `bl-${mode}`}
           {...input.handlers}
         />
         {children}

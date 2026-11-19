@@ -162,11 +162,66 @@ const registeredUrlBuilders = new Map<string, (id: string) => string>();
 
 export const registerObjectUrl = (typeName: string, builder: (id: string) => string): void => {
   registeredUrlBuilders.set(toKebabCase(typeName), builder);
+  urlTypeNames.set(toKebabCase(typeName), typeName);
 };
+
+/** 開く先を名乗った型の、名乗ったときの綴り（kebab-case → 元の名前） */
+const urlTypeNames = new Map<string, string>();
 
 /** 型 + id から登録済みのデフォルト開きURLを導出する（未登録なら undefined） */
 export const getObjectUrl = (typeName: string, id: string): string | undefined => {
   return registeredUrlBuilders.get(toKebabCase(typeName))?.(id);
+};
+
+/**
+ * **この url の泡は、どの型のものか。** 開く先（{@link registerObjectUrl}）を逆に読む。
+ *
+ * > 開く先から始まれば、その型の泡。開く先から id を抜いたものなら、その型の一覧。
+ *
+ *   notes/abc          → Note（開く先そのもの）
+ *   notes/abc/card     → Note（札も、同じものの別の見え方）
+ *   itineraries/x/plan → Itinerary（盤も同じ）
+ *   notes              → Note の一覧
+ *   map                → undefined（どの型の開く先でもない）
+ *
+ * ★ 泡の側に「私は Note です」と書かせない。開く先はもう名乗ってあるので、
+ *   同じことを 2 か所に書くと、片方だけ直したときにずれる。
+ * ★ 当たる開く先が 2 つあれば、長く一致したほうを採る。
+ * ★ `type` は名乗ったときの綴り（`Note`）、`kind` は kebab-case（`note`）。
+ *   アイコンやラベルを引く口（`getObjectTypeIcon` など）は `kind` で引く。
+ */
+export const objectTypeOfUrl = (
+  url: string,
+): { readonly type: string; readonly kind: string; readonly list: boolean } | undefined => {
+  const path = url.split(/[?#]/)[0];
+  /** id の代わりに差し込む印。url に出てくることのない字 */
+  const MARK = '\u0000';
+  let best: { type: string; kind: string; list: boolean; len: number } | undefined;
+  for (const [kebab, build] of registeredUrlBuilders) {
+    const shape = build(MARK);
+    const at = shape.indexOf(MARK);
+    if (at < 0) continue;
+    const head = shape.slice(0, at);
+    const tail = shape.slice(at + MARK.length);
+    const type = urlTypeNames.get(kebab) ?? kebab;
+    const take = (list: boolean, len: number) => {
+      if (!best || len > best.len) best = { type, kind: kebab, list, len };
+    };
+    // その型のもの：頭 ＋ id（/ を含まない）＋ 尻尾、そのあとは終わりか / で続く
+    if (path.startsWith(head)) {
+      const rest = path.slice(head.length);
+      const cut = rest.indexOf('/');
+      const id = cut < 0 ? rest : rest.slice(0, cut);
+      const after = cut < 0 ? '' : rest.slice(cut);
+      if (id && after.startsWith(tail) && (after.length === tail.length || after[tail.length] === '/')) {
+        take(false, head.length + tail.length);
+      }
+    }
+    // その型の一覧：開く先から id を抜いたもの（`notes/:id` なら `notes`）
+    const listPath = head.replace(/\/$/, '');
+    if (tail === '' && listPath && path === listPath) take(true, listPath.length);
+  }
+  return best && { type: best.type, kind: best.kind, list: best.list };
 };
 
 /**
