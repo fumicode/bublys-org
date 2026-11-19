@@ -1,0 +1,47 @@
+# シフトントンのデスクトップ版（Windows の EXE インストーラー）を作る。
+#
+# 手で実行する（Actions → 「シフトントン デスクトップ版（Windows）」→ Run workflow）。
+# できたインストーラーは、実行結果のページの Artifacts からダウンロードする。
+# コード署名はまだしていないので、初めて開くと SmartScreen の警告が出る。
+name: シフトントン デスクトップ版（Windows）
+
+on:
+  workflow_dispatch:
+  # ★ 一時的: #238 の PR だけ、マージ前に Windows で試せるようにインストーラーを作る。
+  #   手で実行するボタンは main に入るまで出ないため。マージ前にこの 2 行と、下の if を消す。
+  pull_request:
+    paths: ["hotel-shift-puzzle-bubly/hotel-shift-puzzle-electron/**", ".github/workflows/shiftonton-desktop.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    # 消し忘れても、ほかの PR では走らない
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'kanetaku1/issue238'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      # 署名の証明書を探しに行かない（まだ署名しない）
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 依存を入れる
+        run: npm ci
+
+      - name: インストーラーを作る
+        run: npx nx run @bublys-org/hotel-shift-puzzle-electron:package:win --skip-nx-cache
+
+      - name: インストーラーを置く
+        uses: actions/upload-artifact@v4
+        with:
+          name: shiftonton-windows
+          path: hotel-shift-puzzle-bubly/hotel-shift-puzzle-electron/release/*.exe
+          if-no-files-found: error
+          retention-days: 30

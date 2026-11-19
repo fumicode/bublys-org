@@ -1,0 +1,55 @@
+{
+  "name": "@bublys-org/hotel-shift-puzzle-electron",
+  "version": "0.1.0",
+  "private": true,
+  "description": "シフトントンのデスクトップ版（Electron）。ネットにつながない PC で動く",
+  "author": "bublys-org",
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "start": "electron .",
+    "package:win": "electron-builder --win --x64 --publish never",
+    "package:dir": "electron-builder --dir --publish never"
+  },
+  "devDependencies": {
+    "electron": "45.1.0",
+    "electron-builder": "26.18.0"
+  },
+  "nx": {
+    "targets": {
+      "start": {
+        "dependsOn": [
+          "build",
+          {
+            "projects": [
+              "@bublys-org/hotel-shift-puzzle-app"
+            ],
+            "target": "build"
+          }
+        ]
+      },
+      "package:win": {
+        "dependsOn": [
+          "build",
+          {
+            "projects": [
+              "@bublys-org/hotel-shift-puzzle-app"
+            ],
+            "target": "build"
+          }
+        ]
+      },
+      "package:dir": {
+        "dependsOn": [
+          "build",
+          {
+            "projects": [
+              "@bublys-org/hotel-shift-puzzle-app"
+            ],
+            "target": "build"
+          }
+        ]
+      }
+    }
+  }
+}

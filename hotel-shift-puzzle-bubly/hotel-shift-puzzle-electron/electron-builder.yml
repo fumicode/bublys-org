@@ -1,0 +1,48 @@
+# シフトントンのデスクトップ版を EXE（インストーラー）にする設定。
+#
+# ★ appId と、src/lib/identity.ts の値は一度配ったら変えない
+#   （変えると、前の版で作った勤務表が見えなくなる）。
+#   productName（スタートメニューに出る名前）は変えてよい。
+appId: org.bublys.shiftonton
+productName: シフトントン
+executableName: shiftonton
+copyright: bublys-org
+
+directories:
+  output: release
+  buildResources: build-resources
+
+# Electron 側のコード（tsc の出力）だけ。
+# ★ node_modules は同梱しない。実行時に使う依存は無い（Electron 本体は別に入る）のに、
+#   モノレポの中だと electron-builder がルートの node_modules を辿って全部詰めてしまう（数百 MB）。
+files:
+  - dist/**/*.js
+  - package.json
+  - "!**/node_modules/**/*"
+
+# 画面（Web 版のビルド結果）をそのまま同梱する
+extraResources:
+  - from: ../hotel-shift-puzzle-app/dist
+    to: renderer
+    filter:
+      - "**/*"
+      - "!**/*.map"
+
+asar: true
+# ネイティブモジュールは使わない
+npmRebuild: false
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+# ユーザーごとのインストーラー（管理者権限は要らない）。
+# アンインストールしてもデータ（%APPDATA%\shiftonton）は残す。
+nsis:
+  oneClick: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
+  shortcutName: シフトントン
+  artifactName: shiftonton-setup-${version}.${ext}
