@@ -23,7 +23,7 @@ export * from './schedule/MonthlyStaffSchedule.js';
 export * from './schedule/PrecedingMonthTail.js';
 // 稼働日ごとの予約状況（宿泊人数・部屋数）。勤務表に紐づく姉妹集約。店ごとに付け替える想定。
 export * from './schedule/DailyReservationInfo.js';
-export * from './schedule/ScheduleReport.js';
+export * from './schedule/ConfirmedSchedule.js';
 // 1つの手で制約違反がどう増減したか（候補集合・詰みの解消案で使う）
 export * from './schedule/ConstraintDelta.js';
 

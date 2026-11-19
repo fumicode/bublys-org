@@ -1,12 +1,9 @@
 'use client';
 
-import { FC, HTMLAttributes, ReactNode, Ref, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { FC, HTMLAttributes, Ref, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
 import {
   ObjectView,
-  UrledPlace,
-  getDragType,
-  extractIdFromUrl,
   useKeyBindings,
   BubblesContext,
   isSmallScreen,
@@ -19,7 +16,7 @@ import {
   DailyReservationInfo,
   StaffMonthlyShiftWish,
   ConstraintSet,
-  ScheduleReport,
+  ConfirmedSchedule,
   fulfillWishesStep,
   makeSatisfyLeaderRulesStep,
   makeResolveAmbiguousLeaderSlotsStep,
@@ -41,7 +38,7 @@ import {
   shiftColorOfNames,
 } from "../ui/ScheduleConstraintsBar.js";
 import { ShiftCommandsBar } from "../ui/ShiftCommandsBar.js";
-import { LinkedReportsView } from "../ui/LinkedReportsView.js";
+import { InheritanceView } from "../ui/InheritanceView.js";
 import { DeadCellDiagnosisView } from "../ui/DeadCellDiagnosisView.js";
 import {
   useObjects,
@@ -63,16 +60,18 @@ import {
   nextForcedCellAfter,
 } from "./candidates/index.js";
 import { scheduleConstraintsOf, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
-import { prioritizeStaffByReport } from "./reportPriority.js";
-import { buildScheduleReport } from "./buildScheduleReport.js";
+import { prioritizeStaffByContribution } from "./contributionPriority.js";
+import { buildReview } from "./buildReview.js";
 import { rokuyoNoteOf } from "./rokuyoNote.js";
 import {
-  capturePrecedingTail,
+  captureInheritance,
   confirmedAtOf,
-  newerReferenceCandidate,
-  referenceCandidates,
-  withReference,
+  inheritedScoresOf,
+  pendingInheritanceOf,
+  precedingConfirmedOf,
 } from "./precedingMonth.js";
+import { versionLabelFor } from "./versionLabel.js";
+import { useConfirmedVersion } from "./confirmedVersion.js";
 import { useScheduleHistory } from "./useScheduleHistory.js";
 import { scheduleUndoBindings } from "./scheduleWorldLineKeys.js";
 import { useCellClipboard } from "./cellClipboard/useCellClipboard.js";
@@ -82,7 +81,6 @@ import {
   recordSetCells,
   recordScheduleMutation,
   recordConstraintEdit,
-  recordReferenceEdit,
 } from "./recordScheduleEdit.js";
 import {
   WORKSHIFT_SET_TYPE,
@@ -90,7 +88,7 @@ import {
   WORKING_STAFF_GROUP_TYPE,
   SCHEDULE_RESERVATION_INFO_TYPE,
   CONSTRAINT_SET_TYPE,
-  SCHEDULE_REPORT_TYPE,
+  CONFIRMED_SCHEDULE_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 import {
@@ -108,8 +106,6 @@ type ScheduleGridProps = {
    * 開く側（app 層）の責務。
    */
   onOpenWorldLine?: () => void;
-  /** 完成レポート確定後に呼ばれる（レポートバブルを開くのは app 層の関心事） */
-  onConfirm?: (reportId: string) => void;
   /**
    * 各アクションバブルの URL（data-url アンカー用）。ボタンを UrledPlace で包むと、
    * そのボタンから link bubble が伸びる。openBubble する URL と一致させる。
@@ -144,15 +140,8 @@ type ScheduleGridProps = {
     key: string
   ) => string;
   /**
-   * シフト完成レポートバブルの URL を作る（レポート ID）。同上・app 層から注入。
-   * レポート ID は scheduleId と現在の apex ノード ID から決まる（ScheduleReport.idOf）ため、
-   * 確定前でも「今クリックしたら作られるレポート」の URL を先読みして「完成レポートを
-   * 作成」ボタンに付けられる（そのボタン自身が schedule-report の bubble link 起点になる）。
-   */
-  reportBubbleUrl?: (reportId: string) => string;
-  /**
    * スタッフ名から開くスタッフ詳細バブルの URL を作る（staffId を渡す）。この勤務表の文脈を
-   * 持った URL を渡すと、詳細にこの勤務表の参照レポートでの評価が出る。同上・app 層から注入。
+   * 持った URL を渡すと、詳細にこの勤務表の前月の振り返りが出る。同上・app 層から注入。
    */
   staffBubbleUrl?: (staffId: string) => string;
   /**
@@ -165,6 +154,12 @@ type ScheduleGridProps = {
    * 注入する（URL スキームと同じ流儀）。渡さなければ main thread で同期計算する。
    */
   createCandidatesWorker?: () => Worker;
+  /** 振り返りバブルの URL（data-url アンカー用）。「振り返りを開く」ボタンから link bubble が伸びる */
+  reviewUrl?: string;
+  /** 振り返りバブルを開く。確定後に自動で開くときもこれを使う */
+  onOpenReview?: () => void;
+  /** 前月の振り返りバブルの URL を作る（前月の勤務表IDを渡す）。引き継ぎ欄から開く */
+  precedingReviewUrl?: (scheduleId: string) => string;
 };
 
 /** 新しい責任者ルールの一意キーを生成する。 */
@@ -178,7 +173,6 @@ const newLeaderRuleKey = (): string =>
 const ScheduleGridBody: FC<ScheduleGridProps> = ({
   scheduleId,
   onOpenWorldLine,
-  onConfirm,
   worldLineUrl,
   treeUrl,
   workingStaffUrl,
@@ -186,11 +180,13 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   dayBubbleUrl,
   violationBubbleUrl,
   bubbleUrlOf,
-  reportBubbleUrl,
   staffBubbleUrl,
   reservationInfoUrl,
   onOpenRule,
   createCandidatesWorker,
+  reviewUrl,
+  onOpenReview,
+  precedingReviewUrl,
 }) => {
   const store = useAppStore();
   const { scope } = useScheduleHistory();
@@ -279,31 +275,24 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     [constraints, scheduleId]
   );
 
-  // 参照レポート（過去のシフト完成レポートを1つ紐づける）。自動シフトの実行前に
-  // staffList をこれの貢献度スコアで並べ替え、休みを優先して取れる順にする（reportPriority.ts）。
-  const allReports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
-  const reportRepo = useObjectRepo<ScheduleReport>(SCHEDULE_REPORT_TYPE);
-  const linkedReport = useMemo(
-    () => allReports.find((r) => r.id === constraints?.linkedReportId),
-    [allReports, constraints]
+  // 前月の確定版（同じ店舗の1か月前。店舗×月で1つなので選ぶ余地は無い）と、そこから引き継いだもの。
+  // 引き継ぎ（月末の勤務と★）は勤務表に焼き付いている（precedingMonth.ts）。
+  const allReports = useObjects<ConfirmedSchedule>(CONFIRMED_SCHEDULE_TYPE);
+  const reportRepo = useObjectRepo<ConfirmedSchedule>(CONFIRMED_SCHEDULE_TYPE);
+  const precedingConfirmed = useMemo(
+    () => (schedule ? precedingConfirmedOf(allReports, schedule) : undefined),
+    [allReports, schedule]
   );
-  // 参照レポートの候補：同じ店舗の前月の確定（ScheduleReport.isReferenceableFrom）を、確定の新しい順に。
-  // 参照レポートの確定版の末尾が、この勤務表の月初につながる（月跨ぎ。詳しくは precedingMonth.ts）。
-  const referenceOptions = useMemo(
-    () =>
-      schedule
-        ? referenceCandidates(allReports, schedule, (r) => confirmedAtOf(store, r))
-        : [],
-    [allReports, schedule, store]
-  );
-  const linkedOption = linkedReport
-    ? { report: linkedReport, confirmedAt: confirmedAtOf(store, linkedReport) }
+  const inherited = schedule?.precedingTail;
+  // 作った後に前月の確定版が置き換わっても、あとから確定しても、勝手には取り込まない。知らせるだけ
+  const pendingInheritance = pendingInheritanceOf(precedingConfirmed, inherited);
+  // 引き継いだ貢献度は、スイッチがオンのときだけ自動シフトの優先度（と★の表示）に使う
+  const priorityStars = constraints?.useContributionPriority
+    ? inheritedScoresOf(inherited, precedingConfirmed)
     : undefined;
-  // 作った後に前月の確定が増えても勝手には差し替えない。より新しい確定があれば知らせるだけ
-  const newerReference = newerReferenceCandidate(referenceOptions, linkedOption);
-  // 貢献度スコアは、スイッチがオンのときだけ自動シフトの優先度（と★の表示）に使う
-  const priorityReport = constraints?.useReportPriority ? linkedReport : undefined;
-  const [linkingReference, setLinkingReference] = useState(false);
+  const [importingInheritance, setImportingInheritance] = useState(false);
+  // この勤務表が持っている確定版（あれば振り返りを出す）と、その版のノードの名前
+  const confirmedVersion = useConfirmedVersion(scheduleId);
   // 確定版の読み出しは非同期なので、記録するときは待っている間の編集を含む最新の値へ載せる
   const latestRef = useRef({ schedule, constraints });
   latestRef.current = { schedule, constraints };
@@ -394,7 +383,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
    *
    * `constraints ?? new ConstraintSet(...)` と書いてはいけない。値が読めないのには
    * 「本当に無い」と「メモリ上の CAS から追い出された」の2つの理由があり、後者で空から
-   * 始めると責任者ルールと紐づけレポートを丸ごと消して保存してしまう。
+   * 始めると責任者ルールや上限を丸ごと消して保存してしまう。
    * 存在の判定は参照で行い、読み込み待ちのあいだは編集させない。
    */
   const constraintsBase = (): ConstraintSet | undefined => {
@@ -407,58 +396,32 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     return ConstraintSet.empty(scheduleId);
   };
 
-  // 参照レポートを紐づける（プルダウン・ドロップ・「取り込む」で同じ入口）。紐づけは1つなので置き換わる。
-  // 参照できないレポート（別の店舗・前月以外の月）は紐づけず、理由を伝える。
-  // 紐づけると、そのレポートの確定版の末尾を写し取り、参照と一緒に1ノードで記録する。
-  const handleLinkReport = async (reportId: string) => {
-    if (!scheduleId || !schedule) return;
-    const report = allReports.find((r) => r.id === reportId);
-    if (!report) return;
-    if (!report.isReferenceableFrom(schedule)) {
-      setAutoMessage(
-        `「${report.title}」は参照レポートにできません（同じ店舗の、前月のレポートだけ紐づけられます）。`
-      );
-      return;
-    }
-    if (!constraintsBase()) return;
-    setLinkingReference(true);
+  // 前月の確定版を取り込む：確定版から引き継ぐもの（月末の勤務と★）を写し取り、勤務表に焼き付ける。
+  // 確定版が読めなければ取り込まない（いまの引き継ぎのまま）。
+  const handleImportInheritance = async () => {
+    if (!schedule || !pendingInheritance) return;
+    setImportingInheritance(true);
     try {
-      const tail = await capturePrecedingTail(
+      const inheritance = await captureInheritance(
         store,
-        { report, confirmedAt: confirmedAtOf(store, report) },
+        pendingInheritance,
         barConstraintSet.maxConsecutiveWorkdays
       );
-      const { schedule: current, constraints: currentConstraints } = latestRef.current;
-      const base = currentConstraints ?? constraintsBase();
-      if (!current || !base) return;
-      const next = withReference(current, base, { reportId, tail });
-      recordReferenceEdit(store, {
-        schedule: current,
-        nextSchedule: next.schedule,
-        nextConstraints: next.constraints,
-      });
-      if (!tail) {
+      if (!inheritance) {
         setAutoMessage(
-          `「${report.title}」の確定版を読み出せなかったので、前月とはつながずに紐づけました（今月1日から数えます）。`
+          `${pendingInheritance.year}年${pendingInheritance.month}月の確定版を読み出せなかったので、取り込めませんでした。`
         );
+        return;
       }
+      const current = latestRef.current.schedule;
+      if (!current) return;
+      recordScheduleMutation(store, {
+        schedule: current,
+        transform: (s) => s.withPrecedingTail(inheritance),
+      });
     } finally {
-      setLinkingReference(false);
+      setImportingInheritance(false);
     }
-  };
-  const handleDropReportUrl = (url: string) => {
-    const reportId = extractIdFromUrl(url);
-    if (reportId) void handleLinkReport(reportId);
-  };
-  // 参照を外すと、前月とのつなぎも一緒に外れる（今月1日から数え直す）
-  const handleUnlinkReport = () => {
-    if (!schedule || !constraints) return;
-    const next = withReference(schedule, constraints, undefined);
-    recordReferenceEdit(store, {
-      schedule,
-      nextSchedule: next.schedule,
-      nextConstraints: next.constraints,
-    });
   };
   // 責任者ルールを後から追加する。新しいルール（担当勤務帯は先頭の勤務帯・候補者は空）を
   // 制約集約に足して保存し、その場で編集バブルを開く。人の集合と時間帯はそこで編集する。
@@ -646,12 +609,12 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   };
 
   // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる。
-  // 参照レポートの貢献度スコアが高い人を先に処理する（休みの取得優先権に効く。詳しくは reportPriority.ts）。
+  // 前月の確定版から引き継いだ貢献度が高い人を先に処理する（休みの取得優先権に効く。詳しくは contributionPriority.ts）。
   // 並び順が効くステップ（grantsDayOffInStaffOrder）を実行したときだけ、優先したことを伝える。
   const handleRunStep = (step: AutoShiftStep) => {
-    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByContribution(
       subsetStaff,
-      priorityReport
+      priorityStars
     );
     const result = runAutoShiftStep(step, {
       schedule,
@@ -672,10 +635,10 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   // 完成案の複数生成：世界線比較ツール。生成後は世界線ビューへ誘導する。
   const handleGenerateCandidates = () => {
     if (!scheduleId) return;
-    // 参照レポートの貢献度スコアが高い人を先に処理する（handleRunStep と同じ優先度づけ）。
-    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
+    // 前月の確定版から引き継いだ★が高い人を先に処理する（handleRunStep と同じ優先度づけ）。
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByContribution(
       subsetStaff,
-      priorityReport
+      priorityStars
     );
     const runOn = (sched: MonthlyStaffSchedule, step: AutoShiftStep) =>
       runAutoShiftStep(step, {
@@ -755,30 +718,26 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     });
   };
 
-  // 「完成レポートを作成」: apex の勤務表状態からレポートを計算して保存し、
-  // apex に確定ラベルを付ける（未命名なら既定ラベルを自動生成。既に名前が
-  // 付いていれば尊重してそのまま残す）。レポートを開くのは app 層（onConfirm）の関心事。
-  //
-  // レポートは「確定時点のスナップショット」（ScheduleReport 参照）なので、同じ apex に対して
-  // 既に作られていれば作り直さず、そのまま開く。このボタンは pendingReportUrl でレポートを
-  // 開く導線も兼ねており、勤務表を編集せずに2回押すと ID（scheduleId + apex.id）が同じまま
-  // create() し直してしまう。そうすると確定後も編集できる項目（タイトル・配慮メモ・
-  // 譲歩/繁忙日の重み）が既定値へ巻き戻って消える。
+  // 「確定する」: いま見ている版（apex）を、この店舗×月の確定版にする（#231）。
+  // 確定版は店舗×月で1つなので、すでにあれば置き換わる（別の勤務表の版でも）。置き換えても
+  // 手で書いた部分（タイトル・配慮メモ・重み）は引き継ぐ（ConfirmedSchedule.confirm）。
+  // apex には「◯月◯日版」の名前を付ける（既に名前があれば尊重して残す）。
+  // 確定したら振り返りバブルを開く。いまの版がすでに確定版なら作り直さず開くだけ。
   // 世界線のノードから状態を取り出すので resolveObjectsAt を使う（同期の getObjectAt だと
   // メモリから追い出されたぶんが黙って読めず、何も起きないボタンになる）。
   const handleConfirm = async () => {
-    if (!scheduleId || !apex) return;
+    if (!scheduleId || !apex || !schedule) return;
 
-    const existing = allReports.find(
-      (r) => r.id === ScheduleReport.idOf(scheduleId, apex.id)
+    const currentConfirmed = allReports.find(
+      (r) => r.id === ConfirmedSchedule.idFor(schedule.storeId, schedule.year, schedule.month)
     );
-    if (existing) {
-      onConfirm?.(existing.id);
+    if (currentConfirmed?.isVersion({ scheduleId, worldLineNodeId: apex.id })) {
+      onOpenReview?.();
       return;
     }
 
     // ここは useObject の同期読みで済ませない。確定はスナップショットを永続化する操作で、
-    // 値がメモリから追い出されていると「無い」と区別がつかず、間違ったレポートを焼いてしまう。
+    // 値がメモリから追い出されていると「無い」と区別がつかず、間違った振り返りを焼いてしまう。
     // 永続ストアからの取得を待てる resolveObjectsAt を使う（読み対称化とは別の理由で必要）。
     // なお staffIds はこの世界の固定メンバー（＝確定時点の名簿）から取る。
     const resolved = await scope.resolveObjectsAt(apex.id);
@@ -800,44 +759,34 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       staffGroup,
     });
 
-    const draft = buildScheduleReport({
+    const draft = buildReview({
       schedule: apexSchedule,
       staffIds: staffList.map((s) => s.id),
       constraints: reportConstraints,
     });
 
-    const report = ScheduleReport.create({
-      scheduleId,
-      worldLineNodeId: apex.id,
-      year: apexSchedule.year,
-      month: apexSchedule.month,
-      storeId: apexSchedule.storeId,
-      ...draft,
-      // 同じ月に確定が複数あるとき、どれが新しいかはこの時刻で決める（前月とのつなぎ）
-      confirmedAt: Date.now(),
-    });
+    const confirmedAt = Date.now();
+    const report = ConfirmedSchedule.confirm(
+      {
+        scheduleId,
+        worldLineNodeId: apex.id,
+        year: apexSchedule.year,
+        month: apexSchedule.month,
+        storeId: apexSchedule.storeId,
+        ...draft,
+        confirmedAt,
+      },
+      currentConfirmed
+    );
     reportRepo.save(report);
 
     if (!apex.label) {
-      scope.setNodeLabel(apex.id, `確定: ${apexSchedule.year}年${apexSchedule.month}月`);
+      const labels = Object.values(scope.graph.state.nodes).flatMap((n) => (n.label ? [n.label] : []));
+      scope.setNodeLabel(apex.id, versionLabelFor(new Date(confirmedAt), labels));
     }
 
-    onConfirm?.(report.id);
+    onOpenReview?.();
   };
-
-  // アクションボタンを URL（data-url）で包む。url があると、その URL のバブルを開いたとき
-  // link bubble がこのボタンから伸びる（openBubble する URL と一致している必要がある）。
-  const withUrl = (url: string | undefined, node: ReactNode): ReactNode =>
-    url ? <UrledPlace url={url}>{node}</UrledPlace> : node;
-
-  // 「完成レポートを作成」ボタン。レポート ID は scheduleId + 現在の apex ノード ID で決まる
-  // （ScheduleReport.idOf）ので、クリック前でも「今押したら作られるレポート」の URL を
-  // 先読みしてボタンに付けられる。これにより schedule-report の bubble link はこのボタン
-  // 自身から伸びる（キセキの木の link が「キセキの木で見る」ボタンから伸びるのと対称）。
-  const pendingReportUrl =
-    scheduleId && apex && reportBubbleUrl
-      ? reportBubbleUrl(ScheduleReport.idOf(scheduleId, apex.id))
-      : undefined;
 
   // 行＝勤務スタッフ群のメンバーなので、その並びの続きに導線を置く（ヘッダには出さない）
   const workingStaffSlot = workingStaffUrl ? (
@@ -908,16 +857,33 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     </>
   );
 
-  const confirmButton = withUrl(
-    pendingReportUrl,
-    <button
-      type="button"
-      className="e-confirm"
-      onClick={() => void handleConfirm()}
-      title="今表示している勤務表を確定し、譲歩・繁忙日対応・貢献度のレポートを作成します"
-    >
-      🏁 完成レポートを作成
-    </button>
+  const confirmArea = (
+    <div className="e-confirm-area">
+      <button
+        type="button"
+        className="e-confirm"
+        onClick={() => void handleConfirm()}
+        title={
+          "いま見ている版を、この月の確定版にします（すでに確定版があれば置き換わります）。" +
+          "翌月の勤務表は、確定版から引き継いで始まります"
+        }
+      >
+        🏁 確定する
+      </button>
+      {confirmedVersion && reviewUrl && (
+        <ObjectView
+          type={CONFIRMED_SCHEDULE_TYPE}
+          id={confirmedVersion.id}
+          url={reviewUrl}
+          label={`${schedule?.year ?? ""}年${schedule?.month ?? ""}月の振り返り`}
+          openingPosition="bubble-side-left"
+        >
+          <span className="e-review-opener" title="ダブルクリックで振り返りを開く">
+            振り返り
+          </span>
+        </ObjectView>
+      )}
+    </div>
   );
 
   return (
@@ -943,7 +909,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         {/* 見出し行には、スタッフ列の見え方ではなく勤務表（この月）そのものに紐づくものを置く */}
         {showPanels && (
         <div className="e-actions e-actions-left">
-          {/* この月のシフト希望（回収状況）。押す前から在るものなのでダブルクリックで開く。 */}
+          {/* この月のシフト希望（回収状況）。押す前から在るものなのでダブルクリックで開く */}
           {shiftWishesUrl && (
             <ObjectView
               type={SHIFT_WISH_MONTH_VIEW_TYPE}
@@ -957,21 +923,45 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
             </ObjectView>
           )}
 
-          {/* 参照レポート＝前月の確定（プルダウンで選ぶか、レポート一覧からドラッグで紐づける）。
-              その確定版の末尾が月初につながる。貢献度スコアを休みの優先度に使うかは
-              制約欄の「★優先」（limitSpecs）で切り替える（precedingMonth.ts / reportPriority.ts）。 */}
-          <LinkedReportsView
-            linked={linkedOption}
-            candidates={referenceOptions}
-            newer={newerReference}
-            onLink={(id) => void handleLinkReport(id)}
-            onDropUrl={handleDropReportUrl}
-            dropAcceptTypes={[getDragType(SCHEDULE_REPORT_TYPE)]}
-            onUnlink={handleUnlinkReport}
-            busy={linkingReference}
+          {/* 前月の確定版からの引き継ぎ。新しい確定版があれば取り込みを促す（precedingMonth.ts）。
+              ★を休みの優先度に使うかは制約欄の「★優先」（limitSpecs）で切り替える。 */}
+          <InheritanceView
+            inherited={
+              inherited?.yearMonth && {
+                ...inherited.yearMonth,
+                confirmedAt: inherited.confirmedAt,
+              }
+            }
+            pending={
+              pendingInheritance && {
+                year: pendingInheritance.year,
+                month: pendingInheritance.month,
+                confirmedAt: confirmedAtOf(store, pendingInheritance),
+              }
+            }
+            onImport={() => void handleImportInheritance()}
+            busy={importingInheritance}
+            wrapSource={(node) =>
+              inherited && precedingReviewUrl ? (
+                <ObjectView
+                  type={CONFIRMED_SCHEDULE_TYPE}
+                  id={precedingConfirmed?.id ?? inherited.source.scheduleId}
+                  url={precedingReviewUrl(inherited.source.scheduleId)}
+                  label={inherited.yearMonth ? `${inherited.yearMonth.year}年${inherited.yearMonth.month}月の振り返り` : "前月の振り返り"}
+                  openingPosition="origin-side"
+                  draggable={false}
+                >
+                  {node}
+                </ObjectView>
+              ) : (
+                node
+              )
+            }
           />
         </div>
         )}
+        {/* 右上：確定する＋振り返り */}
+        {confirmArea}
       </div>
 
       {/* 左: 適用中の制約を動的アイコンで描く（稼働日ごと↕ / 人ごと↔ / 全体）
@@ -1022,7 +1012,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           groupByDepartment={groupByDept}
           workingStaffSlot={workingStaffSlot}
           leaderRules={leaderRules}
-          referenceReport={priorityReport}
+          inheritedScores={priorityStars}
           staffUrlOf={staffBubbleUrl}
           selectedStaffIds={selectedStaffIds}
           onToggleStaffSelected={toggleStaffSelected}
@@ -1100,7 +1090,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
 
       {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く）。
           表が長くても開いた瞬間に見えるよう、バブルの下端に貼り付ける（.e-footer の sticky） */}
-      {(worldLineUrl || treeUrl || pendingReportUrl) && (
+      {(worldLineUrl || treeUrl) && (
         <div className="e-footer">
           {worldLineUrl && (
               <ObjectView
@@ -1130,8 +1120,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
                 </span>
               </ObjectView>
           )}
-          {confirmButton}
-        </div>
+      </div>
       )}
     </StyledContainer>
   );
@@ -1159,7 +1148,7 @@ const StyledContainer = styled.div<HTMLAttributes<HTMLDivElement> & { ref?: Ref<
   .e-header {
     display: flex;
     align-items: center;
-    flex-wrap: wrap; /* 参照レポートが増えても溢れず折り返す */
+    flex-wrap: wrap; /* 引き継ぎ欄が長くなっても溢れず折り返す */
     gap: 12px;
     margin-bottom: 8px;
 
@@ -1171,7 +1160,7 @@ const StyledContainer = styled.div<HTMLAttributes<HTMLDivElement> & { ref?: Ref<
       font-size: 0.8em;
       color: #777;
     }
-    /* 参照レポートのドロップ欄。見出しと1行に収めて縦を抑える */
+    /* 見出しの右の操作（引き継ぎ欄など）。見出しと1行に収めて縦を抑える */
     .e-actions {
       display: flex;
       align-items: center;
@@ -1376,7 +1365,7 @@ const StyledContainer = styled.div<HTMLAttributes<HTMLDivElement> & { ref?: Ref<
   }
 
 
-  /* 左下：世界線ビュー・キセキの木・完成レポート。
+  /* 左下：世界線ビュー・キセキの木。
      バブルの中身がスクロールしても、バブルの下端に貼り付いて見えている
      （以前は表の下にあり、開いた直後はバブルの中を下までスクロールしないと見えなかった） */
   .e-footer {
@@ -1395,7 +1384,34 @@ const StyledContainer = styled.div<HTMLAttributes<HTMLDivElement> & { ref?: Ref<
     box-shadow: 0 -6px 8px -6px rgba(0, 0, 0, 0.15);
   }
 
-  /* 完成レポートを作成(勤務表を確定してレポート＋キセキの木を開く) */
+  /* 右上：確定する＋振り返り展開口 */
+  .e-confirm-area {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto; /* ヘッダの右端へ寄せる */
+  }
+
+  .e-review-opener {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #2e7d32;
+    border-radius: 6px;
+    background: #e8f5e9;
+    color: #2e7d32;
+    font-size: 0.8em;
+    font-weight: 600;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+
+    &:hover {
+      background: #c8e6c9;
+      border-color: #388e3c;
+    }
+  }
+
+  /* 確定する（いま見ている版をこの月の確定版にする） */
   .e-confirm {
     border: 1px solid #2e7d32;
     border-radius: 6px;

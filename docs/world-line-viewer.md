@@ -187,6 +187,26 @@ hotel の実装は対で1ファイルに置いてある：
 （`hotelNestedScope` / `hotelCellRole`）。片方だけ app 層に置くと、規約を直すときに
 片方を直し忘れる。
 
+### 節目（milestone）
+
+成果木（`WorldLineTreeView`）と世界線ビュー（`WorldLineScopeView` / `WorldLinesCanvasView`）は、
+`milestoneNodeIds` で**節目のノード**を受け取り、旗を立てて描く。節目は、そのバブリが
+「この世界線の中で意味のある地点」と呼ぶノード（git の tag にあたる）。何を節目とするかは
+バブリが決め、ライブラリはその意味を知らない。
+
+```tsx
+<WorldLineScopeView scope={scope} milestoneNodeIds={new Set([確定版のノードID])} />
+<WorldLineTreeView graph={scope.graph} milestoneNodeIds={...} />
+```
+
+| 印 | 意味 |
+|---|---|
+| ノードに立つ旗（金色） | 節目。旗の形と色は `milestoneMark.ts` 1か所で決め、両方のビューが同じ旗を描く |
+| 二重リング（世界線ビュー）／光のにじみ（成果木） | apex（いま居る世界）。節目とは**形で分ける** |
+
+hotel は勤務表の確定版のノードを節目として渡す（`feature/confirmedVersion.ts`）。
+画面の 🏁（確定する・引き継ぎ）と同じ記号として読めるよう、旗にしてある。
+
 ### 注入する関数は「読むだけ」にすること
 
 ストアや CAS を読む関数を渡すと、`useMemo` の依存が毎レンダー変わってレイアウトが

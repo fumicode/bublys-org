@@ -26,6 +26,7 @@ import { applyWorldFile, clearDocumentScopes } from "../world-file/applyWorldFil
 import { buildSampleItems } from "../objects/seed.js";
 import { commitBundle, bornWorldsOf } from "../objects/commit.js";
 import { migrateLegacyScopes } from "../objects/migrateLegacyScopes.js";
+import { migrateLegacyReports } from "../objects/migrateLegacyReports.js";
 import { APP_SCOPE_ID } from "../objects/repository.js";
 import {
   validateWorldFile,
@@ -220,6 +221,8 @@ export function useWorldFile(): WorldFileController {
         // 古い形式（固定メンバーの無い世界線）を含むファイルは、ここで作り直す。
         // 勤務表の内容は残り、その試行錯誤の履歴だけが失われる。
         const rebuilt = migrateLegacyScopes(store);
+        // 旧形式の完成レポートを含むファイルは、店舗×月で1つの確定版に畳む（#231）
+        migrateLegacyReports(store);
         dispatch(worldFileSynced({ fileName: name, note: file.note ?? "" }));
 
         const legacyNote =

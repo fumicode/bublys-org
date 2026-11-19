@@ -2,7 +2,7 @@
 
 import { FC, useState } from "react";
 import styled from "styled-components";
-import { Staff, ScheduleReport, WorkingDay, type CompromiseEntry, type BusyDayEntry, type DayOffStyle } from "../domain/index.js";
+import { Staff, ConfirmedSchedule, WorkingDay, type CompromiseEntry, type BusyDayEntry, type DayOffStyle } from "../domain/index.js";
 import { DayOffStyleSelect } from "./DayOffStyleSelect.js";
 import PersonIcon from "@mui/icons-material/Person";
 import EditIcon from "@mui/icons-material/Edit";
@@ -21,9 +21,9 @@ import {
 } from "./shiftWishStatus.js";
 import { STAFF_SHIFT_WISH_SHEET_VIEW_TYPE } from "./viewObjectTypes.js";
 
-/** 参照レポート（紐づけ済みの ScheduleReport）のうち、このスタッフに関する部分だけの読み取り専用サマリ */
-export type StaffLinkedReportSummary = {
-  report: ScheduleReport;
+/** 前月の振り返り（引き継いだ確定版の ConfirmedSchedule）のうち、このスタッフに関する部分だけの読み取り専用サマリ */
+export type StaffReviewSummary = {
+  report: ConfirmedSchedule;
   score: number;
   compromises: CompromiseEntry[];
   busyDays: BusyDayEntry[];
@@ -43,8 +43,8 @@ type StaffDetailViewProps = {
    * ダブルクリック展開・ドラッグ・data-url は ObjectView が担う（URL スキームは app 層）。
    */
   shiftWishUrl?: (year: number, month: number) => string;
-  /** このスタッフに関する参照レポートの評価（貢献度スコア・譲歩/繁忙日・配慮メモ）。読み取り専用 */
-  linkedReportSummaries?: StaffLinkedReportSummary[];
+  /** このスタッフに関する前月の振り返り（★・譲歩/繁忙日・配慮メモ）。読み取り専用 */
+  reviewSummaries?: StaffReviewSummary[];
 };
 
 export const StaffDetailView: FC<StaffDetailViewProps> = ({
@@ -53,7 +53,7 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
   onChangeDayOffStyle,
   shiftWishMonths = [],
   shiftWishUrl,
-  linkedReportSummaries = [],
+  reviewSummaries = [],
 }) => {
   const [editingDept, setEditingDept] = useState(false);
   const [deptValue, setDeptValue] = useState("");
@@ -209,11 +209,11 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
         </section>
       )}
 
-      {linkedReportSummaries.length > 0 && (
+      {reviewSummaries.length > 0 && (
         <section className="e-section">
-          <h4>参照レポートでの評価</h4>
+          <h4>前月の振り返り</h4>
           <ul className="e-linked-reports">
-            {linkedReportSummaries.map(({ report, score, compromises, busyDays, note }) => (
+            {reviewSummaries.map(({ report, score, compromises, busyDays, note }) => (
               <li key={report.id} className="e-linked-report">
                 <div className="e-linked-report-head">
                   <ObjectView
