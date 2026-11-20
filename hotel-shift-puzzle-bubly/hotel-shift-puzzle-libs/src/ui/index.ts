@@ -33,3 +33,4 @@ export * from "./ClimberWorldLineCanvasView.js";
 export * from "./ReviewView.js";
 export * from "./InheritanceView.js";
 export * from "./WorldFileView.js";
+export * from "./ShiftExcelView.js";

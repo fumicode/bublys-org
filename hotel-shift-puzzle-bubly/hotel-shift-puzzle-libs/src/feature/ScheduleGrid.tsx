@@ -99,6 +99,7 @@ import {
   SHIFT_WISH_MONTH_VIEW_TYPE,
   SCHEDULE_WORLD_LINE_VIEW_TYPE,
   SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE,
+  SHIFT_EXCEL_VIEW_TYPE,
 } from "../ui/viewObjectTypes.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
 
@@ -135,6 +136,8 @@ type ScheduleGridProps = {
    * ダブルクリックでこの URL のバブルを開く。URL スキームは app 層の関心事なので注入で受ける。
    */
   reservationInfoUrl?: string;
+  /** Excel入出力バブルの URL。渡すとフッターに Excel ボタンを出す。 */
+  shiftExcelUrl?: string;
   /**
    * 制約1つぶんのバブル URL を作る。上部ルール行の全アイコンがこれで開く。
    * URL スキームは app 層の関心事なので、種類とキーだけ渡して作ってもらう。
@@ -186,6 +189,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   bubbleUrlOf,
   staffBubbleUrl,
   reservationInfoUrl,
+  shiftExcelUrl,
   onOpenRule,
   createCandidatesWorker,
   reviewUrl,
@@ -936,6 +940,20 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
             >
               <span className="e-link" title="ダブルクリックでこの期のシフト希望を開く">
                 シフト希望
+              </span>
+            </ObjectView>
+          )}
+
+          {/* Excel入出力。ダブルクリックでバブルを開く */}
+          {shiftExcelUrl && (
+            <ObjectView
+              type={SHIFT_EXCEL_VIEW_TYPE}
+              url={shiftExcelUrl}
+              label="Excel入出力"
+              openingPosition="bubble-side-right"
+            >
+              <span className="e-link" title="ダブルクリックでExcel入出力を開く">
+                Excel
               </span>
             </ObjectView>
           )}

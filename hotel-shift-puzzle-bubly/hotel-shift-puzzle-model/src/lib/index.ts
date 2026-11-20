@@ -76,3 +76,6 @@ export * from './schedule/affectedCells.js';
 export * from './schedule/ScheduleCandidates.js';
 export * from './schedule/computeCandidates.js';
 export * from './schedule/repairDeadCell.js';
+
+// インポート/エクスポート（行政版シフトCSV/Excelの読み書き）
+export * from './import-export/index.js';

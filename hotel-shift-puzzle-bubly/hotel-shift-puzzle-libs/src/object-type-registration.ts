@@ -17,6 +17,7 @@ import TuneIcon from "@mui/icons-material/Tune";
 import HourglassBottomIcon from "@mui/icons-material/HourglassBottom";
 import EditCalendarIcon from "@mui/icons-material/EditCalendar";
 import EditNoteIcon from "@mui/icons-material/EditNote";
+import DescriptionIcon from "@mui/icons-material/Description";
 import { registerObjectType } from "@bublys-org/bubbles-ui";
 import { registerObjects } from "./objects/framework.js";
 import { HOTEL_OBJECTS } from "./objects/hotelObjects.js";
@@ -29,6 +30,7 @@ import {
   SHIFT_INTERVAL_RULE_VIEW_TYPE,
   SHIFT_WISH_MONTH_VIEW_TYPE,
   STAFF_SHIFT_WISH_SHEET_VIEW_TYPE,
+  SHIFT_EXCEL_VIEW_TYPE,
 } from "./ui/viewObjectTypes.js";
 
 registerObjects(HOTEL_OBJECTS);
@@ -64,4 +66,8 @@ registerObjectType(
 registerObjectType(
   STAFF_SHIFT_WISH_SHEET_VIEW_TYPE,
   React.createElement(EditNoteIcon, { fontSize: "small" })
+);
+registerObjectType(
+  SHIFT_EXCEL_VIEW_TYPE,
+  React.createElement(DescriptionIcon, { fontSize: "small" })
 );

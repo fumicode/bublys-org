@@ -41,3 +41,6 @@ export const SHIFT_WISH_MONTH_VIEW_TYPE = "ShiftWishMonth";
  * もの。まだ一度も入力していない月は集約が存在しないが、入力表は開けるので型名は要る。
  */
 export const STAFF_SHIFT_WISH_SHEET_VIEW_TYPE = "StaffShiftWishSheet";
+
+/** Excel入出力（勤務表のインポート・エクスポート） */
+export const SHIFT_EXCEL_VIEW_TYPE = "ShiftExcel";

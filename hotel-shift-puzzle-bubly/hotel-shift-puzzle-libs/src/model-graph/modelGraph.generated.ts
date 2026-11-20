@@ -3156,6 +3156,112 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "SymbolMapping",
+      "file": "import-export/SymbolMapping.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "entries",
+          "type": "SymbolEntryPlain[]",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "entries"
+      ],
+      "methods": [
+        {
+          "name": "interpret",
+          "params": [
+            "symbol"
+          ],
+          "returns": "SymbolInterpretation | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "isConfirmedDayOff",
+          "params": [
+            "symbol"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "isEmpty",
+          "params": [
+            "symbol"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "symbolForDayOff",
+          "params": [
+            "reason"
+          ],
+          "returns": "string | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "symbolForWish",
+          "params": [
+            "optionKey"
+          ],
+          "returns": "string | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "addEntry",
+          "params": [
+            "entry"
+          ],
+          "returns": "SymbolMapping",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "removeEntry",
+          "params": [
+            "symbol"
+          ],
+          "returns": "SymbolMapping",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "updateEntry",
+          "params": [
+            "symbol",
+            "update"
+          ],
+          "returns": "SymbolMapping",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "SymbolMappingState",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "SymbolMapping",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
       "name": "WorkingDay",
       "file": "schedule/WorkingDay.ts",
       "kind": "value",
