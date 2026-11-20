@@ -134,6 +134,8 @@ export const StyledWrap = styled.div`
     }
   }
   .e-prev-cell {
+    /* 連勤・連休の線（.e-run-bar）をセルの下端に置くため */
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -301,6 +303,11 @@ export const StyledWrap = styled.div`
     color: #c62828;
     background: #ffebee;
     font-weight: bold;
+  }
+  /* 休みの目標日数に届いた。残りの未定は出勤とみなす（連勤の線もそう数える） */
+  .e-off-total.is-secured {
+    color: #2e7d32;
+    background: #e8f5e9;
   }
   /* 最低休日数未満は違反。ダブルクリックで違反バブルを開ける */
   .e-off-total.is-clickable {
@@ -540,6 +547,13 @@ export const StyledWrap = styled.div`
       font-size: 0.8em;
       color: #888;
     }
+    /* 日付の注記（六曜など）。色は DAY_NOTE_COLOR（シンボル辞書）がインラインで付ける */
+    .e-day-note {
+      font-size: 0.65em;
+      line-height: 1.1;
+      color: #999;
+      white-space: nowrap;
+    }
 
     &.is-sun .e-day-num,
     &.is-sun .e-day-wd {
@@ -562,6 +576,32 @@ export const StyledWrap = styled.div`
       align-items: center;
       justify-content: center;
       width: 100%;
+    }
+  }
+
+  /* 狭い表示（compact。スマホなど）: 表を読むのを優先する。
+     - 左のスタッフ列は名前だけ（人のアイコン・抽出のチェックは畳む）
+     - 右の「休」「早」の列は固定しない。左右の両方を固定すると、幅 380px ほどの画面では
+       日の列が3日ぶんしか見えない。休・早は日の列と一緒に流れ、右端までスクロールすれば読める */
+  .e-grid.is-compact {
+    .e-staff-icon,
+    .e-staff-check {
+      display: none;
+    }
+    .e-staff {
+      padding: 4px;
+    }
+    /* 左上の部署フィルタも細い列に収める */
+    .e-dept-select {
+      max-width: 52px;
+    }
+    .e-off-head,
+    .e-off-total,
+    .e-early-head,
+    .e-early-total,
+    .e-res-filler,
+    .e-res-early-filler {
+      right: auto;
     }
   }
 

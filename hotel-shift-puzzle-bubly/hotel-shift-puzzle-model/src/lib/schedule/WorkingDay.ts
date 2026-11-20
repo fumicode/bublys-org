@@ -42,17 +42,20 @@ export class WorkingDay {
   /**
    * 一意キー・ISO日付 "2026-06-01"（辞書順でソート可能）
    * 索引や比較で多用されるので、不変であることを利用して初回だけ組み立てる。
+   *
+   * 覚え書きは `#`（本当の非公開フィールド）に置く。普通のフィールドだと、`.key` を読んだ日と
+   * 読んでいない日が、同じ日なのに深い比較（テストの toMatchObject / toEqual）で別物になる。
    */
-  private cachedKey?: string;
+  #cachedKey?: string;
 
   get key(): string {
-    if (this.cachedKey === undefined) {
+    if (this.#cachedKey === undefined) {
       const yyyy = String(this.state.year).padStart(4, "0");
       const mm = String(this.state.month).padStart(2, "0");
       const dd = String(this.state.day).padStart(2, "0");
-      this.cachedKey = `${yyyy}-${mm}-${dd}`;
+      this.#cachedKey = `${yyyy}-${mm}-${dd}`;
     }
-    return this.cachedKey;
+    return this.#cachedKey;
   }
 
   /** "6/1" のような短い表示 */
