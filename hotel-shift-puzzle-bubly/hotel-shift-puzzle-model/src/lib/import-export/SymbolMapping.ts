@@ -274,6 +274,44 @@ export const GOVERNMENT_SYMBOL_ENTRIES: readonly SymbolEntryPlain[] = [
     interpretation: { kind: "wish", options: [want("shift-⑦")] },
     label: "⑦勤務（10:00〜17:00・土祝）",
   },
+  // その他の確定休み
+  {
+    symbol: "代",
+    interpretation: { kind: "confirmed-day-off", reason: "weekly" },
+    label: "代休",
+  },
+  {
+    symbol: "公",
+    interpretation: { kind: "confirmed-day-off", reason: "weekly" },
+    label: "公休",
+  },
+  {
+    symbol: "振",
+    interpretation: { kind: "confirmed-day-off", reason: "holiday" },
+    label: "振替休日",
+  },
+  // その他の休暇の希望
+  {
+    symbol: "研",
+    interpretation: { kind: "wish", options: [want(GOV_LEAVE_KEYS.specialLeave)] },
+    label: "研修",
+  },
+  {
+    symbol: "出",
+    interpretation: { kind: "wish", options: [want(GOV_LEAVE_KEYS.specialLeave)] },
+    label: "出張",
+  },
+  // その他の時短勤務帯
+  {
+    symbol: "④",
+    interpretation: { kind: "wish", options: [want("shift-④")] },
+    label: "④勤務",
+  },
+  {
+    symbol: "⑤",
+    interpretation: { kind: "wish", options: [want("shift-⑤")] },
+    label: "⑤勤務",
+  },
   // 曖昧な希望（複数の want）
   {
     symbol: "①ｏｒ②",

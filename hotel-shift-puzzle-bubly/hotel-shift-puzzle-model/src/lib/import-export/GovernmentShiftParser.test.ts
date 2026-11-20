@@ -209,4 +209,62 @@ describe("parseGovernmentShift", () => {
       expect(wy.cellsByDay.get("2026-11-03")).toBe("祝");
     });
   });
+
+  describe("日本語のスタッフ名を読む", () => {
+    function buildGridWithJapaneseName(name: string): string[][] {
+      const row0 = [
+        "",
+        "令和８年10月25日～令和８年11月21日　市民課窓口班（審査担当）シフト",
+        "", "", "", "", "", "", "", "", "", "", "", "", "",
+        "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+      ];
+      const row1 = new Array(31).fill("");
+      const row3 = ["", "R", "", "10-11月",
+        "25", "26", "27", "28", "29", "30", "31",
+        "1", "2", "3", "4", "5", "6", "7", "8",
+        "9", "10", "11", "12", "13", "14", "15", "16",
+        "17", "18", "19", "20", "21",
+      ];
+      const row4 = ["", "8", "", "",
+        "日", "月", "火", "水", "木", "金", "土",
+        "日", "月", "火", "水", "木", "金", "土", "日",
+        "月", "火", "水", "木", "金", "土", "日", "月",
+        "火", "水", "木", "金", "土",
+      ];
+      const staff = ["", "1", "", name,
+        "週", "", "", "", "", "", "週",
+        "週", "", "祝", "", "", "", "週",
+        "週", "", "", "", "", "", "週",
+        "週", "", "", "", "", "", "週",
+      ];
+      const aggregate = ["", "集計", "", "Ａ",
+        ...new Array(28).fill("0"),
+      ];
+      return [row0, row1, row3, row4, staff, aggregate];
+    }
+
+    it("漢字の名前を読み取る（田中太郎）", () => {
+      const result = parseGovernmentShift(buildGridWithJapaneseName("田中太郎"));
+      expect(result.staffEntries).toHaveLength(1);
+      expect(result.staffEntries[0].name).toBe("田中太郎");
+    });
+
+    it("漢字の姓名をスペース区切りで読む（山田 花子）", () => {
+      const result = parseGovernmentShift(buildGridWithJapaneseName("山田 花子"));
+      expect(result.staffEntries).toHaveLength(1);
+      expect(result.staffEntries[0].name).toBe("山田 花子");
+    });
+
+    it("カタカナの名前を読む（タナカ タロウ）", () => {
+      const result = parseGovernmentShift(buildGridWithJapaneseName("タナカ タロウ"));
+      expect(result.staffEntries).toHaveLength(1);
+      expect(result.staffEntries[0].name).toBe("タナカ タロウ");
+    });
+
+    it("1文字の名前も読み取れる（構造ベースの判定）", () => {
+      const result = parseGovernmentShift(buildGridWithJapaneseName("泉"));
+      expect(result.staffEntries).toHaveLength(1);
+      expect(result.staffEntries[0].name).toBe("泉");
+    });
+  });
 });

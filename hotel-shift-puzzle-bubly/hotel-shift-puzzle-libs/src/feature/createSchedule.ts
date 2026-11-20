@@ -22,6 +22,7 @@ import {
   MonthlyStaffSchedule,
   WorkShiftSet,
   createDefaultWorkShiftSet,
+  createGovernmentWorkShiftSet,
   WorkingStaffGroup,
   ConstraintSet,
   type PrecedingMonthTail,
@@ -64,6 +65,8 @@ export function createSchedule(
   params: {
     storeId: string;
     period: SchedulePeriod;
+    /** 形態ID（"hotel" / "government"）。フォールバック勤務帯の選択に使う */
+    formatId?: string;
     /**
      * 前月の確定版から引き継ぐもの（月末の勤務と★。precedingMonth.ts の captureInheritance）。
      * 前月が確定していない・確定版が読めなければ省略（今月1日から数える）
@@ -74,7 +77,7 @@ export function createSchedule(
   const id = newScheduleId();
   const scopeId = localScopeId(SCHEDULE_TYPE, id);
 
-  const { inheritance, ...where } = params;
+  const { inheritance, formatId, ...where } = params;
   // 引き継ぎは生まれたときから持つ（起点のノードに載る）
   const schedule = MonthlyStaffSchedule.create({ id, ...where }).withPrecedingTail(inheritance);
 
@@ -86,7 +89,7 @@ export function createSchedule(
       WORKSHIFT_SET_TYPE,
       (global) => global.withId(id),
       GLOBAL_WORKSHIFT_SET_ID
-    ) ?? createDefaultWorkShiftSet(id);
+    ) ?? (formatId === "government" ? createGovernmentWorkShiftSet(id) : createDefaultWorkShiftSet(id));
 
   // 制約セットも同じ形でコピーする。グローバルで整えた責任者ルール・上限が、
   // 新しい勤務表の出発点になる。未投入なら既定値だけの空セット。

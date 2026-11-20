@@ -113,12 +113,21 @@ const ShiftExcelPanelInner: FC<{
       );
       const unmatchedNames = unmatchedResults.map((s) => s.name);
 
+      // 未知の記号を集約（重複排除）
+      const unknownSymbolSet = new Set<string>();
+      for (const result of converted.staffResults) {
+        for (const symbol of result.unknownSymbols.values()) {
+          unknownSymbolSet.add(symbol);
+        }
+      }
+
       let summary = `${staffCount}名のスタッフを読み込み、${savedCount}名の希望を保存しました。`;
       if (unmatchedNames.length > 0) {
         summary += ` 臨時スタッフとして追加: ${unmatchedNames.join("、")}。`;
       }
       if (unknownCount > 0) {
-        summary += ` 未知の記号が${unknownCount}件あります。`;
+        const symbols = [...unknownSymbolSet].map((s) => `「${s}」`).join(" ");
+        summary += ` 未知の記号が${unknownCount}件あります: ${symbols}`;
       }
 
       setImportSummary(summary);

@@ -137,11 +137,35 @@ export class WorkShiftSet {
   }
 }
 
-/** 既定の勤務帯セット（早番7:00・中番9:00・遅番13:00） */
+/** ホテル用の既定の勤務帯セット（早番7:00・中番9:00・遅番13:00） */
 export function createDefaultWorkShiftSet(id: string): WorkShiftSet {
   return WorkShiftSet.of(id, [
     WorkShift.of("early", "早番", { hour: 7 }, { aliases: ["hayaban", "haya"] }),
     WorkShift.of("middle", "中番", { hour: 9 }, { aliases: ["nakaban", "naka"] }),
     WorkShift.of("late", "遅番", { hour: 13 }, { aliases: ["osoban", "oso"] }),
+  ]);
+}
+
+/**
+ * 行政用の既定の勤務帯セット。
+ * id は SymbolMapping のオプションキー（"shift-A" 等）と一致させている。
+ */
+export function createGovernmentWorkShiftSet(id: string): WorkShiftSet {
+  return WorkShiftSet.of(id, [
+    // 正規職員の勤務帯
+    WorkShift.of("shift-A", "A勤務", { hour: 8, minute: 0 }),
+    WorkShift.of("shift-B", "B勤務", { hour: 8, minute: 30 }),
+    WorkShift.of("shift-E", "E勤務", { hour: 8, minute: 30 }),
+    
+    WorkShift.of("shift-H", "H勤務", { hour: 8, minute: 30 }),
+    WorkShift.of("shift-h", "h勤務", { hour: 8, minute: 30 }),
+    // 会計年度任用（時短勤務帯）
+    WorkShift.of("shift-①", "①勤務", { hour: 8, minute: 30 }),
+    WorkShift.of("shift-②", "②勤務", { hour: 9, minute: 0 }),
+    WorkShift.of("shift-③", "③勤務", { hour: 10, minute: 15 }),
+    WorkShift.of("shift-④", "④勤務", { hour: 10, minute: 0 }),
+    WorkShift.of("shift-⑤", "⑤勤務", { hour: 10, minute: 30 }),
+    WorkShift.of("shift-⑥", "⑥勤務", { hour: 9, minute: 0 }),
+    WorkShift.of("shift-⑦", "⑦勤務", { hour: 10, minute: 0 }),
   ]);
 }

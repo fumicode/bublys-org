@@ -236,42 +236,31 @@ function buildColumnDays(
   return result;
 }
 
+/** 名前列（D列 = index 3） */
+const NAME_COL = 3;
+
 /**
  * スタッフ行をパースする。
- * 名前列の位置は固定（CSV上で3列目付近）。
+ * 行の構造で判定: 2列目（B列）に番号があり、4列目（D列）に名前がある。
  */
 function parseStaffRow(
   row: string[],
   dayColumns: { colIndex: number; day: WorkingDay }[],
 ): StaffEntry | undefined {
-  // スタッフ名を探す: 日本語のイニシャル（全角英字＋全角スペース＋全角英字のパターン）
-  // 名前列は先頭付近（0〜4列目）にある
-  let name = "";
-  let nameColIndex = -1;
-  for (let col = 0; col < Math.min(row.length, 5); col++) {
-    const cell = row[col].trim();
-    if (isStaffName(cell)) {
-      name = cell;
-      nameColIndex = col;
-      break;
-    }
-  }
+  if (row.length <= NAME_COL) return undefined;
 
+  const name = row[NAME_COL].trim();
   if (!name) return undefined;
 
+  // 2列目（B列）に番号がなければスタッフ行ではない
+  const col1 = row[1]?.trim() ?? "";
+  const firstNum = /^\d+$/.test(col1) ? Number(col1) : undefined;
+  if (firstNum === undefined) return undefined;
+
   // 行番号とサブ番号（会計年度任用の番号）
-  let rowNumber: number | undefined;
-  let subNumber: number | undefined;
-  for (let col = 0; col < nameColIndex; col++) {
-    const num = Number(row[col].trim());
-    if (!Number.isNaN(num) && num > 0) {
-      if (rowNumber === undefined) {
-        rowNumber = num;
-      } else {
-        subNumber = num;
-      }
-    }
-  }
+  const rowNumber = firstNum;
+  const col2 = row[2]?.trim() ?? "";
+  const subNumber = /^\d+$/.test(col2) ? Number(col2) : undefined;
 
   // 日ごとのセル値を集める
   const cellsByDay = new Map<string, string>();
@@ -285,14 +274,4 @@ function parseStaffRow(
   }
 
   return { rowNumber, subNumber, name, cellsByDay };
-}
-
-/** スタッフ名らしいか（全角英字を含む、かつ数字だけではない） */
-function isStaffName(text: string): boolean {
-  if (!text || text.length < 2) return false;
-  // 全角英字（Ａ-Ｚ, ａ-ｚ）を含む
-  if (/[Ａ-Ｚａ-ｚ]/.test(text)) return true;
-  // 半角英字2文字以上（W Yのようなイニシャル）
-  if (/[A-Z].*[A-Z]/i.test(text)) return true;
-  return false;
 }
