@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
+import { FC, useMemo, useState, type KeyboardEvent } from "react";
 import styled from "styled-components";
 import PersonIcon from "@mui/icons-material/Person";
 import PersonAddAlt1Icon from "@mui/icons-material/PersonAddAlt1";
@@ -13,16 +13,9 @@ import EditIcon from "@mui/icons-material/Edit";
 import AddIcon from "@mui/icons-material/Add";
 import { Button, IconButton, TextField } from "@mui/material";
 import { ObjectView } from "@bublys-org/bubbles-ui";
-import {
-  PROFILE_CATEGORIES,
-  Staff,
-  WorkShift,
-  type ProfileCategoryKey,
-  type StaffProfile,
-} from "../domain/index.js";
-import { ProfileEditableCell, profileEditableCellStyles } from "./ProfileEditableCell.js";
-import { profileMarkStyles } from "./ProfileMarks.js";
-import { ProfileCategoryCell, profileCategoryCellStyles } from "./StaffProfileTableView.js";
+import { Staff, WorkShift, type DayOffStyle, type StaffProfile } from "../domain/index.js";
+import { DayOffStyleSelect } from "./DayOffStyleSelect.js";
+import { ProfileMarks, profileMarkStyles } from "./ProfileMarks.js";
 
 /** 勤務帯の編集フォームのドラフト。id が null なら新規追加、そうでなければ既存の編集。 */
 type ShiftDraft = { id: string | null; name: string; hour: number };
@@ -64,18 +57,15 @@ type WorkingStaffListViewProps = {
   onCommitShift?: (id: string | null, draft: { name: string; hour: number }) => void;
   /** 勤務帯（列）を取り除く */
   onRemoveShift?: (shiftId: string) => void;
-  /**
-   * その人のこの勤務表でのスタッフプロファイル（#236）。渡すと分類ごとの列を出す。
-   * セルの ✎ で直す（renderProfileEditor）。名前のダブルクリックではスタッフ詳細が開く
-   */
+  /** その人のスタッフプロファイル。渡すと名前の横に絵文字タグを出す */
   profileOf?: (staffId: string) => StaffProfile;
-  /** 名前のダブルクリックで開くスタッフ詳細の URL（この勤務表の値を直せる詳細） */
-  staffUrlOf?: (staffId: string) => string;
   /**
-   * その人のその分類の編集欄（ProfileCategoryFields。この勤務表での値を直す）。
-   * 渡すとセルに ✎ が出て、スタッフ詳細を開かずにその場で直せる
+   * その人の休みの形。base はその人の既定値（スタッフが持つ）、override はこの勤務表だけの
+   * 上書き（無ければ undefined）。渡されたときだけ「休みの形」の列を出す。
    */
-  renderProfileEditor?: (staff: Staff, category: ProfileCategoryKey) => ReactNode;
+  dayOffStyleOf?: (staffId: string) => { base: DayOffStyle; override?: DayOffStyle };
+  /** この勤務表での休みの形を上書きする。undefined で既定値に戻す */
+  onChangeDayOffStyle?: (staffId: string, style: DayOffStyle | undefined) => void;
 };
 
 /**
@@ -105,8 +95,8 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
   onCommitShift,
   onRemoveShift,
   profileOf,
-  staffUrlOf,
-  renderProfileEditor,
+  dayOffStyleOf,
+  onChangeDayOffStyle,
 }) => {
   const [name, setName] = useState("");
   const [department, setDepartment] = useState("");
@@ -121,7 +111,6 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
   const [shiftDraft, setShiftDraft] = useState<ShiftDraft | null>(null);
 
   const shiftColumnsEditable = editable && !!onCommitShift;
-
 
   const commitShift = () => {
     if (shiftDraft) {
@@ -291,13 +280,14 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
                 <tr>
                   <th className="e-th-handle" />
                   <th className="e-th-name">名前</th>
-                  {/* スタッフプロファイル（分類ごと。見るだけ。直すのはスタッフ詳細） */}
-                  {profileOf &&
-                    PROFILE_CATEGORIES.map((c) => (
-                      <th key={c.key} className="e-th-profile">
-                        {c.label}
-                      </th>
-                    ))}
+                  {dayOffStyleOf && (
+                    <th
+                      className="e-th-day-off-style"
+                      title="休みの形。既定値はスタッフが持ち、この勤務表だけ変えられます"
+                    >
+                      休みの形
+                    </th>
+                  )}
                   {workShifts.map((shift) => (
                     <th key={shift.id} className="e-th-shift" title={shift.name}>
                       {shiftColumnsEditable && shiftDraft?.id === shift.id ? (
@@ -449,7 +439,6 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
                       ) : (
                         <ObjectView
                           object={staff}
-                          url={staffUrlOf?.(staff.id)}
                           label={staff.name}
                           draggable={true}
                           openingPosition="bubble-side-right"
@@ -464,27 +453,35 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
                             {staff.department && (
                               <span className="e-dept">{staff.department}</span>
                             )}
+                            {profileOf && (
+                              <span className="e-emoji-tags">
+                                <ProfileMarks marks={profileOf(staff.id).emojiTags} />
+                              </span>
+                            )}
                           </span>
                         </ObjectView>
                       )}
                     </td>
 
-                    {profileOf &&
-                      PROFILE_CATEGORIES.map((c) => (
-                        <td key={c.key} className="e-profile-cell">
-                          {/* セルは ✎ でその場で直す。スタッフ詳細は名前のダブルクリックで開く */}
-                          <span className="e-profile-open">
-                            <ProfileEditableCell
-                              title={`${staff.name}：${c.label}（この勤務表）`}
-                              editor={
-                                renderProfileEditor && (() => renderProfileEditor(staff, c.key))
-                              }
-                            >
-                              <ProfileCategoryCell entries={profileOf(staff.id).entriesIn(c.key)} />
-                            </ProfileEditableCell>
-                          </span>
+                    {dayOffStyleOf && (() => {
+                      const { base, override } = dayOffStyleOf(staff.id);
+                      return (
+                        <td className="e-day-off-style-cell">
+                          <DayOffStyleSelect
+                            className={`e-day-off-style${override ? " is-overridden" : ""}`}
+                            value={override}
+                            inherited={base}
+                            disabled={!editable || !onChangeDayOffStyle}
+                            title={
+                              override
+                                ? `${staff.name} はこの勤務表だけ「${override.label}」（既定は${base.label}）`
+                                : `${staff.name} の休みの形（既定値のまま）`
+                            }
+                            onChange={(style) => onChangeDayOffStyle?.(staff.id, style)}
+                          />
                         </td>
-                      ))}
+                      );
+                    })()}
 
                     {workShifts.map((shift) => (
                       <td key={shift.id} className="e-shift-cell">
@@ -621,6 +618,16 @@ const StyledContainer = styled.div`
     white-space: nowrap;
   }
 
+  .e-emoji-tags {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    margin-left: 2px;
+    flex-shrink: 0;
+  }
+
+  ${profileMarkStyles}
+
   /* ---- 左：名簿（焼き付け） ---- */
   .e-roster {
     flex: 0 0 auto;
@@ -690,33 +697,11 @@ const StyledContainer = styled.div`
       color: #aaa;
     }
 
-    /* スタッフプロファイルの列（分類の順。責任者・休みの形・辞書の項目） */
-    .e-th-profile {
+    .e-th-day-off-style {
       font-weight: normal;
       font-size: 0.75em;
       color: #888;
       white-space: nowrap;
-    }
-    .e-th-profile .e-leader-badge {
-      font-weight: bold;
-      padding: 1px 4px;
-      border-radius: 3px;
-    }
-    .e-profile-cell {
-      text-align: center;
-    }
-    /* プロファイルの記号とセルの中身（プロファイルの表と共有） */
-    ${profileMarkStyles}
-    ${profileCategoryCellStyles}
-    ${profileEditableCellStyles}
-    .e-profile-cell {
-      text-align: left;
-    }
-    .e-profile-open {
-      display: flex;
-      min-height: 24px;
-      align-items: center;
-      padding: 0 4px;
     }
 
     .e-day-off-style {

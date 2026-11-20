@@ -6,13 +6,12 @@
  * 時間移動でその編集に戻れないことを意味するので、静かに壊れると気づけない。
  */
 import { worldLineGraphSlice } from '@bublys-org/world-line-graph';
-import { MonthlyStaffSchedule, Staff, WorkingStaffGroup } from '@bublys-org/hotel-shift-puzzle-model';
+import { EmojiTag, MonthlyStaffSchedule, Staff } from '@bublys-org/hotel-shift-puzzle-model';
 import { registerObjects } from './framework.js';
 import {
   HOTEL_OBJECTS,
   SCHEDULE_TYPE,
   STAFF_TYPE,
-  WORKING_STAFF_GROUP_TYPE,
 } from './hotelObjects.js';
 import { APP_SCOPE_ID, localScopeId, saveObject } from './commit.js';
 import { createSchedule } from '../feature/createSchedule.js';
@@ -172,29 +171,22 @@ describe('どの操作でどのスコープが伸びるか', () => {
   });
 
   /**
-   * ★ スタッフプロファイル（#236）は、何も選んでいなければ保存形に書かない。
-   *   だからプロファイルを入れる前に生まれた世界でも、上書きを付けて外せば元のノードへ戻る
-   *   （移行の前後をまたいで打ち消しスナップが効く）。
+   * ★ 絵文字タグ（#236）は、何も付けていなければ保存形に書かない。
+   *   だからタグを付ける前に生まれた世界でも、付けて外せば元のノードへ戻る
+   *   （打ち消しスナップが効く）。
    */
-  it('★ プロファイルの上書きを付けて外すと、元のノードへ戻る（世界線が伸びない）', () => {
-    const { store, schedule, scopeId } = setUp();
-    const apexOf = () => store.getState().worldLineGraph.graphs[scopeId].apexNodeId;
+  it('★ 絵文字タグを付けて外すと、元のノードへ戻る（世界線が伸びない）', () => {
+    const { store } = setUp();
+    const apexOf = () => store.getState().worldLineGraph.graphs[APP_SCOPE_ID].apexNodeId;
     const nodeA = apexOf();
-    const group = WorkingStaffGroup.ofRoster(schedule.workingStaffGroupId, ['s1', 's2', 's3']);
 
-    saveObject(store, WORKING_STAFF_GROUP_TYPE, group.overrideProfileValues('s1', 'experience', ['new']));
+    saveObject(store, STAFF_TYPE, new Staff({ id: 's1', name: 'staff1', tags: [new EmojiTag({ emoji: '🔰' })] }));
     expect(apexOf()).not.toBe(nodeA);
-    const countAfterB = store.counts()[scopeId];
+    const countAfterB = store.counts()[APP_SCOPE_ID];
 
-    saveObject(
-      store,
-      WORKING_STAFF_GROUP_TYPE,
-      group
-        .overrideProfileValues('s1', 'experience', ['new'])
-        .overrideProfileValues('s1', 'experience', undefined)
-    );
+    saveObject(store, STAFF_TYPE, new Staff({ id: 's1', name: 'staff1' }));
 
-    expect(store.counts()[scopeId]).toBe(countAfterB);
+    expect(store.counts()[APP_SCOPE_ID]).toBe(countAfterB);
     expect(apexOf()).toBe(nodeA);
   });
 

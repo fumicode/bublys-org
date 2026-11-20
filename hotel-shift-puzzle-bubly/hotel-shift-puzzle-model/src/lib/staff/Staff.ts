@@ -8,7 +8,7 @@
  * 上書きできる。state は休みの形を**インスタンスで**持つので、保存形は {@link StaffPlain}。
  */
 import { DayOffStyle, type DayOffStylePlain } from "./DayOffStyle.js";
-import { ProfileSelection, type ProfileSelectionPlain } from "./ProfileSelection.js";
+import { EmojiTag, EmojiTags, type EmojiTagPlain } from "./EmojiTag.js";
 
 export type StaffState = {
   id: string;
@@ -17,11 +17,8 @@ export type StaffState = {
   department?: string;
   /** 休みの形の既定値。未設定は分散型 */
   dayOffStyle?: DayOffStyle;
-  /**
-   * スタッフプロファイルの辞書の項目で選んだ値（店舗での既定。#236）。
-   * 勤務表ごとに WorkingStaffMember で項目ごとに上書きできる。未設定は何も選んでいない
-   */
-  profile?: ProfileSelection;
+  /** 絵文字タグ（#236）。フリーフォームで人に付ける。未設定は空 */
+  tags?: EmojiTag[];
 };
 
 /** シリアライズ用 */
@@ -30,8 +27,8 @@ export type StaffPlain = {
   name: string;
   department?: string;
   dayOffStyle?: DayOffStylePlain;
-  /** 何も選んでいなければ書かない（プロファイル以前の記録と同じ形・同じハッシュを保つ） */
-  profile?: ProfileSelectionPlain;
+  /** 絵文字タグ。空なら書かない（タグ以前の記録と同じ形・同じハッシュを保つ） */
+  tags?: EmojiTagPlain[];
 };
 
 export class Staff {
@@ -60,20 +57,29 @@ export class Staff {
     return this.state.dayOffStyle ?? DayOffStyle.DEFAULT;
   }
 
-  /** スタッフプロファイルの辞書の項目で選んだ値（店舗での既定）。未設定は空 */
-  get profile(): ProfileSelection {
-    return this.state.profile ?? ProfileSelection.EMPTY;
+  /** 絵文字タグ。未設定は空 */
+  get tags(): readonly EmojiTag[] {
+    return this.state.tags ?? [];
   }
 
-  /**
-   * 辞書の項目の値を決めた新しい Staff を返す。空配列はその項目を外す（店舗での既定に
-   * 「何も無い」を明示する必要はないので、決めていない状態に戻す）。変わらなければ自分自身。
-   */
-  setProfileValues(itemId: string, valueIds: readonly string[]): Staff {
-    const current = this.profile;
-    const next = valueIds.length === 0 ? current.clear(itemId) : current.set(itemId, valueIds);
-    if (next === current) return this;
-    return new Staff({ ...this.state, profile: next.isEmpty ? undefined : next });
+  /** タグを追加した新しい Staff を返す。同じ絵文字が既にあれば何もしない。 */
+  addTag(tag: EmojiTag): Staff {
+    const next = EmojiTags.add(this.tags, tag);
+    if (next.length === this.tags.length) return this;
+    return new Staff({ ...this.state, tags: next });
+  }
+
+  /** タグを外した新しい Staff を返す。 */
+  removeTag(emoji: string): Staff {
+    const next = EmojiTags.remove(this.tags, emoji);
+    if (next.length === this.tags.length) return this;
+    return new Staff({ ...this.state, tags: next.length > 0 ? next : undefined });
+  }
+
+  /** タグのラベルを変えた新しい Staff を返す。 */
+  updateTagLabel(emoji: string, label: string | undefined): Staff {
+    const next = EmojiTags.updateLabel(this.tags, emoji, label);
+    return new Staff({ ...this.state, tags: next });
   }
 
   /** 名前を変更した新しい Staff を返す。変わらなければ自分自身。 */
@@ -98,8 +104,8 @@ export class Staff {
     const plain: StaffPlain = { id: this.state.id, name: this.state.name };
     if (this.state.department !== undefined) plain.department = this.state.department;
     if (this.state.dayOffStyle) plain.dayOffStyle = this.state.dayOffStyle.toPlain();
-    if (this.state.profile && !this.state.profile.isEmpty) {
-      plain.profile = this.state.profile.toPlain();
+    if (this.state.tags && this.state.tags.length > 0) {
+      plain.tags = EmojiTags.toPlain(this.state.tags);
     }
     return plain;
   }
@@ -110,7 +116,7 @@ export class Staff {
       name: plain.name,
       department: plain.department,
       dayOffStyle: plain.dayOffStyle ? DayOffStyle.fromPlain(plain.dayOffStyle) : undefined,
-      profile: plain.profile?.length ? ProfileSelection.fromPlain(plain.profile) : undefined,
+      tags: plain.tags?.length ? EmojiTags.fromPlain(plain.tags) : undefined,
     });
   }
 }

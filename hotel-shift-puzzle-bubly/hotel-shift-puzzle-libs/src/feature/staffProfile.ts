@@ -1,54 +1,71 @@
+import { useMemo } from "react";
 import {
+  Staff,
   staffProfileOf,
-  STAFF_PROFILE_DICTIONARY_ID,
   type ShiftLeaderRule,
-  type Staff,
   type StaffProfile,
-  type StaffProfileDictionary,
   type WorkingStaffGroup,
 } from "../domain/index.js";
-import { useObject } from "../objects/repository.js";
-import { STAFF_PROFILE_DICTIONARY_TYPE } from "../objects/hotelObjects.js";
-
-/**
- * スタッフプロファイルの辞書（店舗共通。いまはアプリに1つ）。
- * external なので、勤務表の世界の中から読んでも常にグローバルの最新を見る。無ければ undefined。
- */
-export const useStaffProfileDictionary = (): StaffProfileDictionary | undefined =>
-  useObject<StaffProfileDictionary>(STAFF_PROFILE_DICTIONARY_TYPE, STAFF_PROFILE_DICTIONARY_ID);
+import { useWorld } from "../objects/world.js";
+import { STAFF_TYPE } from "../objects/hotelObjects.js";
 
 /**
  * その勤務表での、人ごとのスタッフプロファイルを引く関数を作る（#236）。
  * 勤務表・日別バブルの名前の横の記号は、どれもこれで引く（描くのは ui/ProfileMarks）。
  *
- * - 辞書の項目・休みの形 … 勤務メンバーの上書き → その人の既定値
- * - 責任者             … 勤務表の制約セット（leaderRules）
+ * - 絵文字タグ … Staff.tags（フリーフォーム）
+ * - 責任者     … 勤務表の制約セット（leaderRules）
+ * - 休みの形   … Staff の既定 → WorkingStaffMember で上書き
  *
- * 勤務スタッフ群がまだ無い勤務表（群より前に作られたもの）は、既定値だけで読む。
+ * globalStaffById: タグは pinned の焼き付けが古い可能性があるので、
+ * APP スコープの最新 Staff を渡すとそちらのタグを使う。
  */
 export const staffProfileResolver = ({
   staffList,
   staffGroup,
-  dictionary,
   leaderRules,
+  globalStaffById,
 }: {
   staffList: readonly Staff[];
   staffGroup?: WorkingStaffGroup;
-  dictionary?: StaffProfileDictionary;
   leaderRules?: readonly ShiftLeaderRule[];
+  globalStaffById?: ReadonlyMap<string, Staff>;
 }): ((staffId: string) => StaffProfile) => {
   const byId = new Map(staffList.map((s) => [s.id, s]));
   const cache = new Map<string, StaffProfile>();
   return (staffId) => {
     const cached = cache.get(staffId);
     if (cached) return cached;
+    let staff = byId.get(staffId);
+    // タグだけ APP スコープの最新値を使う（pinned の焼き付けは古い可能性がある）
+    if (staff && globalStaffById) {
+      const global = globalStaffById.get(staffId);
+      if (global && global.tags !== staff.tags) {
+        staff = new Staff({
+          ...staff.state,
+          tags: global.tags.length > 0 ? [...global.tags] : undefined,
+        });
+      }
+    }
     const profile = staffProfileOf(staffId, {
-      staff: byId.get(staffId),
+      staff,
       member: staffGroup?.memberOf(staffId),
-      dictionary,
       leaderRules,
     });
     cache.set(staffId, profile);
     return profile;
   };
 };
+
+/**
+ * APP スコープの Staff を ID → インスタンスのマップで返す。
+ * pinned の焼き付けが古い場合にタグの最新値を引くために使う。
+ */
+export function useGlobalStaffById(): ReadonlyMap<string, Staff> {
+  const world = useWorld();
+  const shells = world.app.shells<Staff>(STAFF_TYPE);
+  return useMemo(
+    () => new Map(shells.map((s) => [s.object.id, s.object])),
+    [shells]
+  );
+}

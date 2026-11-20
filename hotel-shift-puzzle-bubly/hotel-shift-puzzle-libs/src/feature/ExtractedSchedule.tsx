@@ -38,7 +38,7 @@ import {
 } from "../objects/hotelObjects.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
 import { useWorkingStaff } from "./workingStaff.js";
-import { staffProfileResolver, useStaffProfileDictionary } from "./staffProfile.js";
+import { staffProfileResolver } from "./staffProfile.js";
 
 type ExtractedScheduleProps = {
   scheduleId?: string;
@@ -106,16 +106,14 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
     [allLeaderRules, idSet]
   );
   // 名前の横の記号（スタッフプロファイル）。責任者は抽出に関係するルールだけを出す
-  const profileDictionary = useStaffProfileDictionary();
   const profileOf = useMemo(
     () =>
       staffProfileResolver({
         staffList: allStaff,
         staffGroup,
-        dictionary: profileDictionary,
         leaderRules: relevantRules,
       }),
-    [allStaff, staffGroup, profileDictionary, relevantRules]
+    [allStaff, staffGroup, relevantRules]
   );
 
   const wishByStaff = useMemo(() => {

@@ -6,7 +6,7 @@ import { Staff } from "@bublys-org/hotel-shift-puzzle-model";
 import { StaffListView } from "../ui/StaffListView.js";
 import { useObjects, useObjectRepo } from "../objects/repository.js";
 import { STAFF_TYPE } from "../objects/hotelObjects.js";
-import { staffProfileResolver, useStaffProfileDictionary } from "./staffProfile.js";
+import { staffProfileResolver } from "./staffProfile.js";
 
 /** 新しいスタッフの ID を生成する */
 const newStaffId = (): string =>
@@ -16,10 +16,9 @@ export const StaffCollection: FC = () => {
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const actions = useObjectRepo<Staff>(STAFF_TYPE);
   // 名前の横の記号は、勤務表と同じ引き方で読む（名簿は勤務表の外なので既定値だけ）
-  const profileDictionary = useStaffProfileDictionary();
   const profileOf = useMemo(
-    () => staffProfileResolver({ staffList, dictionary: profileDictionary }),
-    [staffList, profileDictionary]
+    () => staffProfileResolver({ staffList }),
+    [staffList]
   );
 
   const handleCreate = (name: string, department: string) => {

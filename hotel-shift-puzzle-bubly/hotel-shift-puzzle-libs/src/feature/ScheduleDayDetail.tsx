@@ -23,7 +23,7 @@ import {
 } from "../objects/hotelObjects.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
 import { useWorkingStaff } from "./workingStaff.js";
-import { staffProfileResolver, useStaffProfileDictionary } from "./staffProfile.js";
+import { staffProfileResolver } from "./staffProfile.js";
 
 type ScheduleDayDetailProps = {
   scheduleId?: string;
@@ -88,16 +88,14 @@ const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({
   });
 
   // 名前の横の記号（スタッフプロファイル）。勤務表グリッドと同じ引き方で読む
-  const profileDictionary = useStaffProfileDictionary();
   const profileOf = useMemo(
     () =>
       staffProfileResolver({
         staffList,
         staffGroup,
-        dictionary: profileDictionary,
         leaderRules,
       }),
-    [staffList, staffGroup, profileDictionary, leaderRules]
+    [staffList, staffGroup, leaderRules]
   );
 
   if (!schedule) {

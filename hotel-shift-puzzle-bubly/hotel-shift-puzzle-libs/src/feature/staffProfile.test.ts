@@ -3,11 +3,10 @@ import {
   ShiftLeaderRule,
   WorkingStaffGroup,
 } from "@bublys-org/hotel-shift-puzzle-model";
-import { createSampleStaffList, createSampleStaffProfileDictionary } from "../data/index.js";
+import { createSampleStaffList } from "../data/index.js";
 import { staffProfileResolver } from "./staffProfile.js";
 
 const staffList = createSampleStaffList();
-const dictionary = createSampleStaffProfileDictionary();
 const night = new ShiftLeaderRule({
   key: "night",
   label: "夜責",
@@ -17,12 +16,11 @@ const night = new ShiftLeaderRule({
 
 describe("staffProfileResolver — 名前の横の記号を、勤務表・日別バブル・名簿で同じ引き方で読む", () => {
   test("例データの新人（伊藤）には 🔰 が付く", () => {
-    const profileOf = staffProfileResolver({ staffList, dictionary });
+    const profileOf = staffProfileResolver({ staffList });
     expect(profileOf("staff-5").marks[0]).toEqual({
-      kind: "symbol",
-      text: "🔰",
-      label: "経験：新人",
-      framed: false,
+      kind: "emojiTag",
+      emoji: "🔰",
+      label: "新人",
     });
   });
 
@@ -34,21 +32,18 @@ describe("staffProfileResolver — 名前の横の記号を、勤務表・日別
     const profileOf = staffProfileResolver({
       staffList,
       staffGroup,
-      dictionary,
       leaderRules: [night],
     });
 
-    expect(profileOf("staff-tsuchiya").marks.map((m) => m.kind)).toEqual(["leader", "dayOffStyle"]);
-    expect(profileOf("staff-tsuchiya").entry(":dayOffStyle")?.source).toBe("member");
+    expect(profileOf("staff-tsuchiya").marks.map((m) => m.kind)).toEqual([
+      "emojiTag",
+      "leader",
+      "dayOffStyle",
+    ]);
   });
 
-  test("勤務表で新人を外す上書きをすると、その勤務表では 🔰 が消える", () => {
-    const staffGroup = WorkingStaffGroup.ofRoster(
-      "g",
-      staffList.map((s) => s.id)
-    ).overrideProfileValues("staff-5", "experience", []);
-    const profileOf = staffProfileResolver({ staffList, staffGroup, dictionary });
-
-    expect(profileOf("staff-5").marks.some((m) => m.kind === "symbol")).toBe(false);
+  test("タグのない人には絵文字タグが出ない", () => {
+    const profileOf = staffProfileResolver({ staffList });
+    expect(profileOf("staff-1").emojiTags).toHaveLength(0);
   });
 });

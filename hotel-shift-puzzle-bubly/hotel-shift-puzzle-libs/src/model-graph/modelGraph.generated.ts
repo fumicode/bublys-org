@@ -633,6 +633,63 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "EmojiTag",
+      "file": "staff/EmojiTag.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "emoji",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "optional": true
+        }
+      ],
+      "getters": [
+        "emoji",
+        "label"
+      ],
+      "methods": [
+        {
+          "name": "withLabel",
+          "params": [
+            "label"
+          ],
+          "returns": "EmojiTag",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "sameEmoji",
+          "params": [
+            "other"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "EmojiTagState",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "EmojiTag",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
       "name": "MaxConsecutiveWorkdaysConstraint",
       "file": "schedule/MaxConsecutiveWorkdaysConstraint.ts",
       "kind": "value",
@@ -2226,8 +2283,8 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": true
         },
         {
-          "name": "profile",
-          "type": "ProfileSelection",
+          "name": "tags",
+          "type": "EmojiTag[]",
           "optional": true
         }
       ],
@@ -2237,14 +2294,32 @@ export const MODEL_GRAPH: ModelGraph = {
         "department",
         "hasDayOffStyle",
         "dayOffStyle",
-        "profile"
+        "tags"
       ],
       "methods": [
         {
-          "name": "setProfileValues",
+          "name": "addTag",
           "params": [
-            "itemId",
-            "valueIds"
+            "tag"
+          ],
+          "returns": "Staff",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "removeTag",
+          "params": [
+            "emoji"
+          ],
+          "returns": "Staff",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "updateTagLabel",
+          "params": [
+            "emoji",
+            "label"
           ],
           "returns": "Staff",
           "isStatic": false,
@@ -2443,34 +2518,15 @@ export const MODEL_GRAPH: ModelGraph = {
       "kind": "value",
       "fields": [],
       "getters": [
-        "marks",
-        "markGroups"
+        "emojiTags",
+        "leaderMarks"
       ],
-      "methods": [
-        {
-          "name": "entriesIn",
-          "params": [
-            "category"
-          ],
-          "returns": "ProfileEntry[]",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "entry",
-          "params": [
-            "itemId"
-          ],
-          "returns": "ProfileEntry | undefined",
-          "isStatic": false,
-          "returnsSelf": false
-        }
-      ]
+      "methods": []
     },
     {
       "name": "StaffProfileDictionary",
       "file": "staff/StaffProfileDictionary.ts",
-      "kind": "aggregate",
+      "kind": "part",
       "fields": [
         {
           "name": "id",
@@ -2787,17 +2843,6 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": true
         },
         {
-          "name": "overrideProfileValues",
-          "params": [
-            "staffId",
-            "itemId",
-            "valueIds"
-          ],
-          "returns": "WorkingStaffGroup",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
           "name": "temporaryStaff",
           "params": [],
           "returns": "Staff[]",
@@ -2921,11 +2966,6 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "dayOffStyle",
           "type": "DayOffStyle",
           "optional": true
-        },
-        {
-          "name": "profile",
-          "type": "ProfileSelection",
-          "optional": true
         }
       ],
       "getters": [
@@ -2933,7 +2973,6 @@ export const MODEL_GRAPH: ModelGraph = {
         "allowedShiftIds",
         "hasDayOffStyleOverride",
         "dayOffStyleOverride",
-        "profileOverride",
         "staffId",
         "isTemporary",
         "staff"
@@ -3005,26 +3044,6 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "overrideDayOffStyle",
           "params": [
             "style"
-          ],
-          "returns": "WorkingStaffMember",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "profileValueIdsOf",
-          "params": [
-            "itemId",
-            "staff"
-          ],
-          "returns": "readonly string[]",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "overrideProfileValues",
-          "params": [
-            "itemId",
-            "valueIds"
           ],
           "returns": "WorkingStaffMember",
           "isStatic": false,
@@ -3442,10 +3461,10 @@ export const MODEL_GRAPH: ModelGraph = {
     },
     {
       "from": "Staff",
-      "to": "ProfileSelection",
+      "to": "EmojiTag",
       "kind": "contains",
-      "via": "profile",
-      "many": false,
+      "via": "tags",
+      "many": true,
       "foundBy": "type"
     },
     {
@@ -3482,14 +3501,6 @@ export const MODEL_GRAPH: ModelGraph = {
     },
     {
       "from": "WorkingStaffMember",
-      "to": "ProfileSelection",
-      "kind": "contains",
-      "via": "profile",
-      "many": false,
-      "foundBy": "type"
-    },
-    {
-      "from": "WorkingStaffMember",
       "to": "Staff",
       "kind": "contains",
       "via": "staff",
@@ -3515,7 +3526,7 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 49,
+    "fileCount": 50,
     "classesWithoutState": [
       "AllowedShiftConstraint",
       "MaxConsecutiveWorkdaysConstraint",
