@@ -3,27 +3,25 @@
 import { FC, useState } from "react";
 import styled from "styled-components";
 import {
-  PROFILE_CATEGORIES,
   Staff,
+  EmojiTag,
   ScheduleReport,
   WorkingDay,
   type CompromiseEntry,
   type BusyDayEntry,
+  type DayOffStyle,
 } from "../domain/index.js";
-import {
-  ProfileCategoryFields,
-  profileCategoryFieldsStyles,
-  type ProfileCategoryFieldsProps,
-} from "./ProfileCategoryFields.js";
 import PersonIcon from "@mui/icons-material/Person";
 import EditIcon from "@mui/icons-material/Edit";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
+import AddIcon from "@mui/icons-material/Add";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import HandshakeIcon from "@mui/icons-material/Handshake";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import { IconButton, TextField } from "@mui/material";
 import { ObjectView } from "@bublys-org/bubbles-ui";
+import { DayOffStyleSelect } from "./DayOffStyleSelect.js";
 import { ShiftWishStatusIcon } from "./ShiftWishStatusIcon.js";
 import {
   collectedAtLabel,
@@ -43,20 +41,14 @@ export type StaffLinkedReportSummary = {
 
 type StaffDetailViewProps = {
   staff: Staff;
-  /**
-   * どこの値を見ているか（#236）。**スタッフ詳細は勤務表の中の1人。**
-   *   - store    … 勤務表の外（名簿・ポケット）から開いた。店舗の情報（名前・所属・シフト希望）だけ。
-   *                プロファイルはスタッフプロファイルで直す
-   *   - schedule … 勤務表から開いた。その勤務表での値（プロファイル・休みの形・責任者）を直す
-   */
-  scope?: { kind: "store" } | { kind: "schedule"; label: string };
-  /** 部署を変更する（店舗での値だけ。勤務表から開いたときは渡さない） */
+  /** 部署を変更する */
   onChangeDepartment?: (department: string) => void;
-  /**
-   * 勤務表での値のプロファイルの欄（分類ごとに ProfileCategoryFields で描く）。
-   * 勤務表から開いたときだけ渡す
-   */
-  profileFields?: Omit<ProfileCategoryFieldsProps, "category" | "staff" | "department">;
+  /** 休みの形の既定値を変更する（勤務表ごとの上書きは勤務スタッフ群で） */
+  onChangeDayOffStyle?: (style: DayOffStyle) => void;
+  /** 絵文字タグを追加する */
+  onAddTag?: (tag: EmojiTag) => void;
+  /** 絵文字タグを外す */
+  onRemoveTag?: (emoji: string) => void;
   /** 希望を集める月（勤務表がある月）と、この人の回収状況 */
   shiftWishMonths?: ShiftWishMonthSummary[];
   /**
@@ -70,15 +62,35 @@ type StaffDetailViewProps = {
 
 export const StaffDetailView: FC<StaffDetailViewProps> = ({
   staff,
-  scope = { kind: "store" },
   onChangeDepartment,
-  profileFields,
+  onChangeDayOffStyle,
+  onAddTag,
+  onRemoveTag,
   shiftWishMonths = [],
   shiftWishUrl,
   linkedReportSummaries = [],
 }) => {
   const [editingDept, setEditingDept] = useState(false);
   const [deptValue, setDeptValue] = useState("");
+  const [addingTag, setAddingTag] = useState(false);
+  const [tagEmoji, setTagEmoji] = useState("");
+  const [tagLabel, setTagLabel] = useState("");
+
+  const commitTag = () => {
+    const emoji = tagEmoji.trim();
+    if (emoji && onAddTag) {
+      onAddTag(new EmojiTag({ emoji, label: tagLabel.trim() || undefined }));
+    }
+    setTagEmoji("");
+    setTagLabel("");
+    setAddingTag(false);
+  };
+
+  const cancelTag = () => {
+    setTagEmoji("");
+    setTagLabel("");
+    setAddingTag(false);
+  };
 
   const startEditDept = () => {
     setDeptValue(staff.department);
@@ -119,15 +131,6 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
           </ObjectView>
         </div>
       </div>
-
-      {/* スタッフプロファイル（#236）。分類ごとに並べる。組み込みの項目（所属・休みの形）も
-          その分類の中に置き、辞書の項目はここで店舗での既定値を選ぶ */}
-      {/* どこの値を見ているか。開いた場所の値を編集する（名簿＝店舗の既定値／勤務表＝その勤務表での値） */}
-      <p className={`e-scope is-${scope.kind}`}>
-        {scope.kind === "schedule"
-          ? `${scope.label}での値を表示・編集しています。既定値（店舗）と違う値は、この勤務表だけに効きます。`
-          : "店舗の情報です。経験・休みの形などのプロファイルは「スタッフプロファイル」で、勤務表ごとの値は勤務表から開いて直します。"}
-      </p>
 
       <section className="e-section">
         <h4>基本情報</h4>
@@ -177,23 +180,94 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
               </>
             )}
           </dd>
+          <dt>休みの形</dt>
+          <dd>
+            {onChangeDayOffStyle ? (
+              <DayOffStyleSelect
+                className="e-day-off-style"
+                value={staff.dayOffStyle}
+                onChange={(style) => style && onChangeDayOffStyle(style)}
+                title="自動シフトが休みを置くときの形の既定値。勤務表ごとに勤務スタッフ群で変えられます"
+              />
+            ) : (
+              staff.dayOffStyle.label
+            )}
+          </dd>
         </dl>
-        {profileFields && <ProfileCategoryFields category="basic" staff={staff} {...profileFields} />}
       </section>
 
-      {/* 勤務表の中の1人として、その勤務表での値を分類ごとに直す（表の ✎ と同じ欄） */}
-      {profileFields &&
-        PROFILE_CATEGORIES.filter((c) => c.key !== "basic").map((c) => {
-          const hasDictionaryItems = (profileFields.dictionary?.itemsIn(c.key).length ?? 0) > 0;
-          const hasBuiltIn = c.key === "role" || c.key === "workStyle";
-          if (!hasDictionaryItems && !hasBuiltIn) return null;
-          return (
-            <section key={c.key} className="e-section">
-              <h4>{c.label}</h4>
-              <ProfileCategoryFields category={c.key} staff={staff} {...profileFields} />
-            </section>
-          );
-        })}
+      {(onAddTag || staff.tags.length > 0) && (
+        <section className="e-section">
+          <h4>絵文字タグ</h4>
+          <div className="e-tags">
+            {staff.tags.map((tag) => (
+              <span
+                key={tag.emoji}
+                className="e-tag"
+                title={tag.label ?? tag.emoji}
+              >
+                <span className="e-tag-emoji">{tag.emoji}</span>
+                {tag.label && <span className="e-tag-label">{tag.label}</span>}
+                {onRemoveTag && (
+                  <button
+                    className="e-tag-remove"
+                    onClick={() => onRemoveTag(tag.emoji)}
+                    aria-label={`${tag.emoji} を外す`}
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            ))}
+            {onAddTag && !addingTag && (
+              <IconButton
+                size="small"
+                className="e-tag-add-btn"
+                onClick={() => setAddingTag(true)}
+                aria-label="絵文字タグを追加"
+              >
+                <AddIcon fontSize="small" />
+              </IconButton>
+            )}
+          </div>
+          {addingTag && (
+            <div className="e-tag-form">
+              <TextField
+                variant="standard"
+                size="small"
+                autoFocus
+                placeholder="絵文字"
+                value={tagEmoji}
+                onChange={(e) => setTagEmoji(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitTag();
+                  if (e.key === "Escape") cancelTag();
+                }}
+                sx={{ width: 60 }}
+                inputProps={{ style: { fontSize: "1.2em", textAlign: "center" } }}
+              />
+              <TextField
+                variant="standard"
+                size="small"
+                placeholder="ラベル（任意）"
+                value={tagLabel}
+                onChange={(e) => setTagLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitTag();
+                  if (e.key === "Escape") cancelTag();
+                }}
+                sx={{ flex: 1 }}
+              />
+              <IconButton size="small" onClick={commitTag} aria-label="追加">
+                <CheckIcon fontSize="small" sx={{ color: "#2e7d32" }} />
+              </IconButton>
+              <IconButton size="small" onClick={cancelTag} aria-label="キャンセル">
+                <CloseIcon fontSize="small" sx={{ color: "#999" }} />
+              </IconButton>
+            </div>
+          )}
+        </section>
+      )}
 
       {shiftWishUrl && (
         <section className="e-section">
@@ -348,29 +422,11 @@ const StyledStaffDetail = styled.div`
     }
   }
 
-  /* どこの値を見ているか（名簿＝店舗の既定値／勤務表＝その勤務表での値） */
-  .e-scope {
-    margin: 0 0 8px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.78em;
-    background: #f5f5f5;
-    color: #607d8b;
-    &.is-schedule {
-      background: #e0f2f1;
-      color: #00695c;
-    }
-  }
   /* 役割・責任の説明（責任者は勤務表ごとに決めるので、ここでは選ばない） */
   .e-profile-note {
     margin: 0 0 4px;
     font-size: 0.8em;
     color: #78909c;
-  }
-  /* プロファイルの欄（表の ✎ と共有） */
-  ${profileCategoryFieldsStyles}
-  .e-section .e-profile-fields {
-    margin-top: 6px;
   }
 
   .e-dl {
@@ -398,6 +454,57 @@ const StyledStaffDetail = styled.div`
         color: #3949ab;
       }
     }
+  }
+
+  .e-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .e-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: #f3e5f5;
+    font-size: 0.9em;
+  }
+
+  .e-tag-emoji {
+    font-size: 1.1em;
+  }
+
+  .e-tag-label {
+    font-size: 0.85em;
+    color: #666;
+  }
+
+  .e-tag-remove {
+    all: unset;
+    cursor: pointer;
+    margin-left: 2px;
+    color: #999;
+    font-size: 0.85em;
+    &:hover {
+      color: #d32f2f;
+    }
+  }
+
+  .e-tag-add-btn {
+    color: #9e9e9e;
+    &:hover {
+      color: #1976d2;
+    }
+  }
+
+  .e-tag-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin-top: 8px;
   }
 
   .e-wish-months {

@@ -13,7 +13,6 @@ import {
   hotelNestedScope,
   StaffCollection,
   StaffDetail,
-  StaffProfilePanel,
   WorkShiftCollection,
   ConstraintSetCollection,
   ConstraintLimitBubbleView,
@@ -120,9 +119,6 @@ const ShiftWishBubble: BubbleRoute["Component"] = ({ bubble }) =>
 // --- 勤務帯リストバブル（リスト内で追加・編集） ---
 const WorkShiftListBubble: BubbleRoute["Component"] = () => withObjects(<WorkShiftCollection />);
 
-// --- スタッフプロファイルバブル（人×分類の表＋辞書。店舗共通。#236） ---
-const StaffProfileBubble: BubbleRoute["Component"] = () => withObjects(<StaffProfilePanel />);
-
 // --- 制約セットバブル（グローバルのテンプレート。勤務表作成時にコピーされる） ---
 const ConstraintSetBubble: BubbleRoute["Component"] = () =>
   withObjects(
@@ -187,7 +183,6 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
       treeUrl={treeUrl}
       bubbleUrlOf={(kind, key) => constraintBubbleUrlOf(scheduleId, kind, key)}
       reportBubbleUrl={scheduleReportUrl}
-      staffBubbleUrl={(staffId) => scheduleStaffDetailUrl(scheduleId, staffId)}
       onOpenRule={(ruleKey) =>
         openOrigin(constraintBubbleUrlOf(scheduleId, "leaderRule", ruleKey))
       }
@@ -202,14 +197,8 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
 };
 
 // --- 勤務スタッフ群バブル（勤務表の「勤務スタッフ」ボタンから開く） ---
-// 名前のダブルクリックでは、この勤務表から開くスタッフ詳細を開く（この勤務表での値を直せる）
 const WorkingStaffBubble: BubbleRoute["Component"] = ({ bubble }) =>
-  withObjects(
-    <WorkingStaffPanel
-      scheduleId={bubble.params.scheduleId}
-      staffBubbleUrl={(staffId) => scheduleStaffDetailUrl(bubble.params.scheduleId, staffId)}
-    />
-  );
+  withObjects(<WorkingStaffPanel scheduleId={bubble.params.scheduleId} />);
 
 // --- 抽出勤務表バブル（選択スタッフだけの勤務表。「抽出」ボタンから開く） ---
 const ExtractedScheduleBubble: BubbleRoute["Component"] = ({ bubble }) =>
@@ -217,9 +206,6 @@ const ExtractedScheduleBubble: BubbleRoute["Component"] = ({ bubble }) =>
     <ExtractedSchedule
       scheduleId={bubble.params.scheduleId}
       staffIds={(bubble.params.staffIds ?? "").split(",").filter(Boolean)}
-      staffBubbleUrl={(staffId) =>
-        scheduleStaffDetailUrl(bubble.params.scheduleId, staffId)
-      }
     />
   );
 
@@ -349,7 +335,6 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/staffs/:staffId", type: "staff", Component: StaffDetailBubble },
   { pattern: "hotel-shift-puzzle/staffs", type: "staff-list", Component: StaffListBubble },
   { pattern: "hotel-shift-puzzle/work-shifts", type: "work-shift-list", Component: WorkShiftListBubble },
-  { pattern: "hotel-shift-puzzle/staff-profile", type: "staff-profile", Component: StaffProfileBubble, bubbleOptions: { defaultSize: { width: 720, height: 600 } } },
   // 制約1つぶんのバブル。具体的な pattern を先に置く（constraints 単体より上）
   { pattern: "hotel-shift-puzzle/constraints/:constraintSetId/limits/:limitKey", type: "constraint-limit", Component: ConstraintLimitBubble, bubbleOptions: { defaultSize: { width: 300, height: 320 } } },
   { pattern: "hotel-shift-puzzle/constraints/:constraintSetId/leader-rules/:ruleKey", type: "constraint-leader-rule", Component: LeaderRuleBubble },
