@@ -13,8 +13,9 @@ import EditIcon from "@mui/icons-material/Edit";
 import AddIcon from "@mui/icons-material/Add";
 import { Button, IconButton, TextField } from "@mui/material";
 import { ObjectView } from "@bublys-org/bubbles-ui";
-import { Staff, WorkShift, type DayOffStyle } from "../domain/index.js";
+import { Staff, WorkShift, type DayOffStyle, type StaffProfile } from "../domain/index.js";
 import { DayOffStyleSelect } from "./DayOffStyleSelect.js";
+import { ProfileMarks, profileMarkStyles } from "./ProfileMarks.js";
 
 /** 勤務帯の編集フォームのドラフト。id が null なら新規追加、そうでなければ既存の編集。 */
 type ShiftDraft = { id: string | null; name: string; hour: number };
@@ -56,6 +57,8 @@ type WorkingStaffListViewProps = {
   onCommitShift?: (id: string | null, draft: { name: string; hour: number }) => void;
   /** 勤務帯（列）を取り除く */
   onRemoveShift?: (shiftId: string) => void;
+  /** その人のスタッフプロファイル。渡すと名前の横に絵文字タグを出す */
+  profileOf?: (staffId: string) => StaffProfile;
   /**
    * その人の休みの形。base はその人の既定値（スタッフが持つ）、override はこの勤務表だけの
    * 上書き（無ければ undefined）。渡されたときだけ「休みの形」の列を出す。
@@ -91,6 +94,7 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
   onToggleShift,
   onCommitShift,
   onRemoveShift,
+  profileOf,
   dayOffStyleOf,
   onChangeDayOffStyle,
 }) => {
@@ -449,6 +453,11 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
                             {staff.department && (
                               <span className="e-dept">{staff.department}</span>
                             )}
+                            {profileOf && (
+                              <span className="e-emoji-tags">
+                                <ProfileMarks marks={profileOf(staff.id).emojiTags} />
+                              </span>
+                            )}
                           </span>
                         </ObjectView>
                       )}
@@ -608,6 +617,16 @@ const StyledContainer = styled.div`
     color: #888;
     white-space: nowrap;
   }
+
+  .e-emoji-tags {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    margin-left: 2px;
+    flex-shrink: 0;
+  }
+
+  ${profileMarkStyles}
 
   /* ---- 左：名簿（焼き付け） ---- */
   .e-roster {

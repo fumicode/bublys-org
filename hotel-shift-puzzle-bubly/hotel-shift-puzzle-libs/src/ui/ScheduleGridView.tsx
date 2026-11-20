@@ -19,10 +19,9 @@ import {
   previewCellValues,
   type CellValuePreview,
   type ScheduleReport,
-  type DayOffStyle,
+  type StaffProfile,
 } from "../domain/index.js";
 import {
-  STAFF_COL_WIDTH,
   STAFF_COL_WIDTH_COMPACT,
   DAY_COL_WIDTH,
   PREV_COL_WIDTH,
@@ -168,8 +167,11 @@ type ScheduleGridViewProps = {
   candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
   /** 休みのセルの役目の説明。セルに触れたときに title で出す */
   dayOffReasonOf?: (staffId: string, day: WorkingDay) => string | undefined;
-  /** その人がこの勤務表で使う休みの形。渡されたら名前の横に印を出す */
-  dayOffStyleOf?: (staffId: string) => DayOffStyle;
+  /**
+   * その人のスタッフプロファイル（#236）。名前の横の記号（🔰・責任者・休みの形…）はこれから描く。
+   * 渡さなければ名前の横には何も出さない
+   */
+  profileOf?: (staffId: string) => StaffProfile;
   /**
    * 候補が1つに絞られた未定セルの、その値（確定提案）。無ければ undefined。
    * セルに薄く描かれ、何も打っていないときの Enter（下の次の提案へ）/ Tab（右の次の提案へ）で承認できる。
@@ -260,7 +262,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   constraints,
   candidateHintOf,
   dayOffReasonOf,
-  dayOffStyleOf,
+  profileOf,
   forcedCellOf,
   isDeadCell,
   onApproveForced,
@@ -525,8 +527,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   const precedingDays = precedingTail?.days ?? [];
   const precedingCols =
     precedingDays.length > 0 ? `repeat(${precedingDays.length}, ${PREV_COL_WIDTH}px) ` : "";
-  const staffColWidth = compact ? STAFF_COL_WIDTH_COMPACT : STAFF_COL_WIDTH;
-  const gridTemplateColumns = `${staffColWidth}px ${precedingCols}repeat(${days.length}, ${DAY_COL_WIDTH}px) ${OFF_COL_WIDTH}px ${EARLY_COL_WIDTH}px`;
+  const staffCol = compact ? `${STAFF_COL_WIDTH_COMPACT}px` : "max-content";
+  const gridTemplateColumns = `${staffCol} ${precedingCols}repeat(${days.length}, ${DAY_COL_WIDTH}px) ${OFF_COL_WIDTH}px ${EARLY_COL_WIDTH}px`;
   // スタッフ列の右から、前月の列＋日列＋休＋早までを覆う span（部署セパレータ・予約トグル帯）
   const daysThroughSummarySpan = `2 / ${precedingDays.length + days.length + 4}`;
 
@@ -553,7 +555,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           violationUrl={violationUrl}
           selected={selectedStaffIds?.has(staff.id)}
           onToggleSelected={onToggleStaffSelected}
-          leaderRules={leaderRules}
+          profile={profileOf?.(staff.id)}
           onSelectRule={onSelectRule}
           referenceReport={referenceReport}
           staffUrl={staffUrlOf?.(staff.id)}
@@ -565,7 +567,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           earlyShiftIds={earlyShiftIds}
           candidateHintOf={candidateHintOf}
           dayOffReasonOf={dayOffReasonOf}
-          dayOffStyle={dayOffStyleOf?.(staff.id)}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
         />
@@ -605,7 +606,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           violationUrl={violationUrl}
           selected={selectedStaffIds?.has(staff.id)}
           onToggleSelected={onToggleStaffSelected}
-          leaderRules={leaderRules}
+          profile={profileOf?.(staff.id)}
           onSelectRule={onSelectRule}
           referenceReport={referenceReport}
           staffUrl={staffUrlOf?.(staff.id)}
@@ -617,7 +618,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           earlyShiftIds={earlyShiftIds}
           candidateHintOf={candidateHintOf}
           dayOffReasonOf={dayOffReasonOf}
-          dayOffStyle={dayOffStyleOf?.(staff.id)}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
         />

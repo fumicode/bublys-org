@@ -1,8 +1,9 @@
 'use client';
 
-import { FC, useMemo } from "react";
+import { FC, useCallback, useMemo } from "react";
 import {
   Staff,
+  EmojiTag,
   ConstraintSet,
   ScheduleReport,
   MonthlyStaffSchedule,
@@ -59,6 +60,16 @@ export const StaffDetail: FC<StaffDetailProps> = ({ staffId, scheduleId, shiftWi
     [staffId, linkedReports]
   );
 
+  // タグ操作
+  const handleAddTag = useCallback(
+    (tag: EmojiTag) => { if (staff) actions.save(staff.addTag(tag)); },
+    [staff, actions]
+  );
+  const handleRemoveTag = useCallback(
+    (emoji: string) => { if (staff) actions.save(staff.removeTag(emoji)); },
+    [staff, actions]
+  );
+
   if (!staff) {
     return (
       <div style={{ padding: 16, color: "#666" }}>
@@ -81,6 +92,8 @@ export const StaffDetail: FC<StaffDetailProps> = ({ staffId, scheduleId, shiftWi
       staff={staff}
       onChangeDepartment={handleChangeDepartment}
       onChangeDayOffStyle={handleChangeDayOffStyle}
+      onAddTag={handleAddTag}
+      onRemoveTag={handleRemoveTag}
       shiftWishMonths={shiftWishMonths}
       shiftWishUrl={shiftWishUrl}
       linkedReportSummaries={linkedReportSummaries}

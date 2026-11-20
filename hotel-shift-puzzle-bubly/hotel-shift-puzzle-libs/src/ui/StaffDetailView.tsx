@@ -2,17 +2,26 @@
 
 import { FC, useState } from "react";
 import styled from "styled-components";
-import { Staff, ScheduleReport, WorkingDay, type CompromiseEntry, type BusyDayEntry, type DayOffStyle } from "../domain/index.js";
-import { DayOffStyleSelect } from "./DayOffStyleSelect.js";
+import {
+  Staff,
+  EmojiTag,
+  ScheduleReport,
+  WorkingDay,
+  type CompromiseEntry,
+  type BusyDayEntry,
+  type DayOffStyle,
+} from "../domain/index.js";
 import PersonIcon from "@mui/icons-material/Person";
 import EditIcon from "@mui/icons-material/Edit";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
+import AddIcon from "@mui/icons-material/Add";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import HandshakeIcon from "@mui/icons-material/Handshake";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import { IconButton, TextField } from "@mui/material";
 import { ObjectView } from "@bublys-org/bubbles-ui";
+import { DayOffStyleSelect } from "./DayOffStyleSelect.js";
 import { ShiftWishStatusIcon } from "./ShiftWishStatusIcon.js";
 import {
   collectedAtLabel,
@@ -36,6 +45,10 @@ type StaffDetailViewProps = {
   onChangeDepartment?: (department: string) => void;
   /** 休みの形の既定値を変更する（勤務表ごとの上書きは勤務スタッフ群で） */
   onChangeDayOffStyle?: (style: DayOffStyle) => void;
+  /** 絵文字タグを追加する */
+  onAddTag?: (tag: EmojiTag) => void;
+  /** 絵文字タグを外す */
+  onRemoveTag?: (emoji: string) => void;
   /** 希望を集める月（勤務表がある月）と、この人の回収状況 */
   shiftWishMonths?: ShiftWishMonthSummary[];
   /**
@@ -51,12 +64,33 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
   staff,
   onChangeDepartment,
   onChangeDayOffStyle,
+  onAddTag,
+  onRemoveTag,
   shiftWishMonths = [],
   shiftWishUrl,
   linkedReportSummaries = [],
 }) => {
   const [editingDept, setEditingDept] = useState(false);
   const [deptValue, setDeptValue] = useState("");
+  const [addingTag, setAddingTag] = useState(false);
+  const [tagEmoji, setTagEmoji] = useState("");
+  const [tagLabel, setTagLabel] = useState("");
+
+  const commitTag = () => {
+    const emoji = tagEmoji.trim();
+    if (emoji && onAddTag) {
+      onAddTag(new EmojiTag({ emoji, label: tagLabel.trim() || undefined }));
+    }
+    setTagEmoji("");
+    setTagLabel("");
+    setAddingTag(false);
+  };
+
+  const cancelTag = () => {
+    setTagEmoji("");
+    setTagLabel("");
+    setAddingTag(false);
+  };
 
   const startEditDept = () => {
     setDeptValue(staff.department);
@@ -105,7 +139,7 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
           <dd>{staff.id}</dd>
           <dt>名前</dt>
           <dd>{staff.name}</dd>
-          <dt>部署</dt>
+          <dt>所属</dt>
           <dd className="e-dept-row">
             {editingDept ? (
               <>
@@ -161,6 +195,79 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
           </dd>
         </dl>
       </section>
+
+      {(onAddTag || staff.tags.length > 0) && (
+        <section className="e-section">
+          <h4>絵文字タグ</h4>
+          <div className="e-tags">
+            {staff.tags.map((tag) => (
+              <span
+                key={tag.emoji}
+                className="e-tag"
+                title={tag.label ?? tag.emoji}
+              >
+                <span className="e-tag-emoji">{tag.emoji}</span>
+                {tag.label && <span className="e-tag-label">{tag.label}</span>}
+                {onRemoveTag && (
+                  <button
+                    className="e-tag-remove"
+                    onClick={() => onRemoveTag(tag.emoji)}
+                    aria-label={`${tag.emoji} を外す`}
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            ))}
+            {onAddTag && !addingTag && (
+              <IconButton
+                size="small"
+                className="e-tag-add-btn"
+                onClick={() => setAddingTag(true)}
+                aria-label="絵文字タグを追加"
+              >
+                <AddIcon fontSize="small" />
+              </IconButton>
+            )}
+          </div>
+          {addingTag && (
+            <div className="e-tag-form">
+              <TextField
+                variant="standard"
+                size="small"
+                autoFocus
+                placeholder="絵文字"
+                value={tagEmoji}
+                onChange={(e) => setTagEmoji(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitTag();
+                  if (e.key === "Escape") cancelTag();
+                }}
+                sx={{ width: 60 }}
+                inputProps={{ style: { fontSize: "1.2em", textAlign: "center" } }}
+              />
+              <TextField
+                variant="standard"
+                size="small"
+                placeholder="ラベル（任意）"
+                value={tagLabel}
+                onChange={(e) => setTagLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitTag();
+                  if (e.key === "Escape") cancelTag();
+                }}
+                sx={{ flex: 1 }}
+              />
+              <IconButton size="small" onClick={commitTag} aria-label="追加">
+                <CheckIcon fontSize="small" sx={{ color: "#2e7d32" }} />
+              </IconButton>
+              <IconButton size="small" onClick={cancelTag} aria-label="キャンセル">
+                <CloseIcon fontSize="small" sx={{ color: "#999" }} />
+              </IconButton>
+            </div>
+          )}
+        </section>
+      )}
 
       {shiftWishUrl && (
         <section className="e-section">
@@ -315,6 +422,13 @@ const StyledStaffDetail = styled.div`
     }
   }
 
+  /* 役割・責任の説明（責任者は勤務表ごとに決めるので、ここでは選ばない） */
+  .e-profile-note {
+    margin: 0 0 4px;
+    font-size: 0.8em;
+    color: #78909c;
+  }
+
   .e-dl {
     display: grid;
     grid-template-columns: auto 1fr;
@@ -340,6 +454,57 @@ const StyledStaffDetail = styled.div`
         color: #3949ab;
       }
     }
+  }
+
+  .e-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .e-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: #f3e5f5;
+    font-size: 0.9em;
+  }
+
+  .e-tag-emoji {
+    font-size: 1.1em;
+  }
+
+  .e-tag-label {
+    font-size: 0.85em;
+    color: #666;
+  }
+
+  .e-tag-remove {
+    all: unset;
+    cursor: pointer;
+    margin-left: 2px;
+    color: #999;
+    font-size: 0.85em;
+    &:hover {
+      color: #d32f2f;
+    }
+  }
+
+  .e-tag-add-btn {
+    color: #9e9e9e;
+    &:hover {
+      color: #1976d2;
+    }
+  }
+
+  .e-tag-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin-top: 8px;
   }
 
   .e-wish-months {

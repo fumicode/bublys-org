@@ -183,7 +183,6 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
       treeUrl={treeUrl}
       bubbleUrlOf={(kind, key) => constraintBubbleUrlOf(scheduleId, kind, key)}
       reportBubbleUrl={scheduleReportUrl}
-      staffBubbleUrl={(staffId) => scheduleStaffDetailUrl(scheduleId, staffId)}
       onOpenRule={(ruleKey) =>
         openOrigin(constraintBubbleUrlOf(scheduleId, "leaderRule", ruleKey))
       }
@@ -207,9 +206,6 @@ const ExtractedScheduleBubble: BubbleRoute["Component"] = ({ bubble }) =>
     <ExtractedSchedule
       scheduleId={bubble.params.scheduleId}
       staffIds={(bubble.params.staffIds ?? "").split(",").filter(Boolean)}
-      staffBubbleUrl={(staffId) =>
-        scheduleStaffDetailUrl(bubble.params.scheduleId, staffId)
-      }
     />
   );
 

@@ -123,7 +123,7 @@ hotel-shift-puzzle-app/src/
 |---|---|---|
 | `live` | その世界で**変化する**。編集でノードが増え、時間移動で戻る | Schedule / WorkingStaffGroup / WorkShiftSet(勤務表用) / ConstraintSet(勤務表用) |
 | `pinned` | 世界の**誕生時に焼き付けられ、以後動かない**。グローバル側の変更・削除は自動では波及しない | Staff |
-| `external`（既定） | 世界に属さず、**世界の中から読んでも常にグローバル** | ScheduleReservationInfo / ScheduleReport / StaffMonthlyShiftWish |
+| `external`（既定） | 世界に属さず、**世界の中から読んでも常にグローバル** | ScheduleReservationInfo / ScheduleReport / StaffMonthlyShiftWish / StaffProfileDictionary |
 
 ```typescript
 Staff:    { membership: { kind: "pinned" } }
@@ -367,6 +367,43 @@ hotelCellRole(ref, currentScopeId)     // その世界でどういう立場か: 
 
 ---
 
+## 人に絵文字タグを付ける（#236）
+
+Discord のリアクションのように、人に **絵文字タグ**（Unicode 1文字 + 任意のラベル）を
+いくつでもペタペタ貼れるようにする。分類や辞書は置かず、フリーフォームで付ける。
+
+### 言葉
+
+| 言葉 | 意味 | 型 |
+|---|---|---|
+| 絵文字タグ | 人に付ける Unicode 1文字＋任意のラベル | `EmojiTag` |
+
+### モデル
+
+```typescript
+type EmojiTag = { emoji: string; label?: string }
+// Staff.tags: EmojiTag[]
+// 順序あり（並び順 = 表示順）、重複なし（同じ emoji は1つだけ）
+```
+
+- 事前登録不要。人を選んで、好きな絵文字を付けるだけ
+- ラベルは任意。付ければツールチップなどで意味を補足できる
+- 属性は他から持ってくることも可能にする（将来の拡張点。今は実装しない）
+
+### 表示
+
+- 名前の横に絵文字を並べる（勤務表・名簿の名前の横はどこも同じ）
+- 組み込みの表示（リーダーバッジ・休みの形アイコン）は従来通り別の仕組みで描く。絵文字タグとは独立に並ぶ
+- ★（前月から引き継いだがんばり）は計算で出るものなので、タグの外
+
+### 編集
+
+- **スタッフ詳細バブルで直接編集する**。個別のスタッフを開いて、絵文字タグを追加・削除できる
+- 勤務表ごとのオーバーライドは今はしない（店舗レベルの値だけ）
+- まとめて編集する専用画面は、必要になったら足す（YAGNI）
+
+---
+
 ## セルの見た目は1つの部品で描く（シンボル辞書）
 
 同じ意味には、どこでも同じ色・形を使う（Symbol Driven Software Design）。記号が繰り返し出ることで、
@@ -417,8 +454,8 @@ hotelCellRole(ref, currentScopeId)     // その世界でどういう立場か: 
 人によって休みの間隔の好みが違うので、休みの形を人ごとに持つ（`staff/DayOffStyle.ts`）。
 **既定値は Staff、勤務表ごとの上書きは WorkingStaffMember。** 引くのは `feature/autoShift.ts` の
 `dayOffStyleResolver` 1箇所で、自動シフトも表の印・ホバーもこれを通す（置き方と説明を食い違わせない）。
-Staff は焼き付け（pinned）なので、スタッフ詳細で既定値を変えても、すでにある勤務表には効かない。
-そちらは勤務スタッフ群で上書きする。
+Staff は焼き付け（pinned）なので、既定値を変えても、すでにある勤務表には効かない。
+そちらは勤務スタッフ（または勤務表から開いたスタッフ詳細）で上書きする。
 
 - **分散型（既定）** … 一番長い出勤の塊の真ん中を割る。休みの隣（＝連休になる日）には、
   ほかに置ける日が無いときだけ置く。連勤上限を超える塊を割るときは隣でも割る（上限が先）。
