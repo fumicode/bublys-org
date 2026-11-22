@@ -79,6 +79,10 @@ const ShiftExcelPanelInner: FC<{
         (name: string) => staffByName.get(name) ?? `imported-${name}`,
       );
 
+      // 期間の不一致チェック
+      const periodMismatch = converted.period != null
+        && !schedule.state.period.equals(converted.period);
+
       // 名簿にないスタッフを臨時の人として WorkingStaffGroup に追加
       const unmatchedResults = converted.staffResults
         .filter((s) => !staffByName.has(s.name));
@@ -101,37 +105,40 @@ const ShiftExcelPanelInner: FC<{
         }
       }
 
-      // 確定休み（休暇・週休・祝日）を勤務表のセルに書き込む
-      const dayMap = new Map(schedule.workingDays().map((d) => [d.key, d]));
-      const REASON_SHORT: Record<string, string> = { "": "休", weekly: "週", holiday: "祝" };
-      const dayOffChanges: { staffId: string; day: WorkingDay; to: ShiftCell }[] = [];
-      for (const result of converted.staffResults) {
-        const staffId = staffByName.get(result.name) ?? `imported-${result.name}`;
-        for (const [dayKey, reason] of result.confirmedDaysOff) {
-          const day = dayMap.get(dayKey);
-          if (day) {
-            dayOffChanges.push({
-              staffId,
-              day,
-              to: { kind: "day-off", reason: REASON_SHORT[reason] ?? reason },
-            });
+      let savedCount = 0;
+      let dayOffChanges: { staffId: string; day: WorkingDay; to: ShiftCell }[] = [];
+
+      if (!periodMismatch) {
+        // 確定休み（休暇・週休・祝日）を勤務表のセルに書き込む
+        const dayMap = new Map(schedule.workingDays().map((d) => [d.key, d]));
+        const REASON_SHORT: Record<string, string> = { "": "休", weekly: "週", holiday: "祝" };
+        for (const result of converted.staffResults) {
+          const staffId = staffByName.get(result.name) ?? `imported-${result.name}`;
+          for (const [dayKey, reason] of result.confirmedDaysOff) {
+            const day = dayMap.get(dayKey);
+            if (day) {
+              dayOffChanges.push({
+                staffId,
+                day,
+                to: { kind: "day-off", reason: REASON_SHORT[reason] ?? reason },
+              });
+            }
           }
         }
-      }
-      let updatedSchedule = schedule;
-      if (dayOffChanges.length > 0) {
-        updatedSchedule = recordSetCells(store, {
-          schedule: updatedSchedule,
-          changes: dayOffChanges,
-        });
-      }
+        let updatedSchedule = schedule;
+        if (dayOffChanges.length > 0) {
+          updatedSchedule = recordSetCells(store, {
+            schedule: updatedSchedule,
+            changes: dayOffChanges,
+          });
+        }
 
-      // 希望を保存（external なので世界線とは別に保存）
-      let savedCount = 0;
-      for (const result of converted.staffResults) {
-        if (result.wish && !result.wish.isEmpty) {
-          wishRepo.save(result.wish);
-          savedCount++;
+        // 希望を保存（external なので世界線とは別に保存）
+        for (const result of converted.staffResults) {
+          if (result.wish && !result.wish.isEmpty) {
+            wishRepo.save(result.wish);
+            savedCount++;
+          }
         }
       }
 
@@ -150,9 +157,15 @@ const ShiftExcelPanelInner: FC<{
         }
       }
 
-      let summary = `${staffCount}名のスタッフを読み込み、${savedCount}名の希望を保存しました。`;
-      if (dayOffChanges.length > 0) {
-        summary += ` 確定休み${dayOffChanges.length}件を反映しました。`;
+      let summary: string;
+      if (periodMismatch) {
+        summary = `⚠ Excelの期間（${converted.period!.label}）が勤務表の期間（${schedule.state.period.label}）と異なります。`
+          + ` ${staffCount}名のスタッフのみ読み込みました。希望・確定休みは反映されません。`;
+      } else {
+        summary = `${staffCount}名のスタッフを読み込み、${savedCount}名の希望を保存しました。`;
+        if (dayOffChanges.length > 0) {
+          summary += ` 確定休み${dayOffChanges.length}件を反映しました。`;
+        }
       }
       if (unmatchedNames.length > 0) {
         summary += ` 臨時スタッフとして追加: ${unmatchedNames.join("、")}。`;
@@ -163,7 +176,10 @@ const ShiftExcelPanelInner: FC<{
       }
 
       setImportSummary(summary);
-      setMessage({ kind: "info", text: "読み込み完了。希望をストアに保存しました。" });
+      const msgText = periodMismatch
+        ? "期間が異なるため、スタッフのみ読み込みました。"
+        : "読み込み完了。希望をストアに保存しました。";
+      setMessage({ kind: periodMismatch ? "warn" : "info", text: msgText });
     } catch (e) {
       setMessage({
         kind: "error",
