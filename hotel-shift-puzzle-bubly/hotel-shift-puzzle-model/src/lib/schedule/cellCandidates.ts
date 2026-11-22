@@ -14,13 +14,24 @@ import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 import type { WorkShift } from "./WorkShift.js";
 import type { WorkingDay } from "./WorkingDay.js";
 
-/** そのセルに入れうる値の全体（勤務帯 + 休み + 未定）。候補集合の出発点。 */
-export function enumerateCellCandidates(workShifts: WorkShift[]): ShiftCell[] {
+/**
+ * そのセルに入れうる値の全体（勤務帯 + 休み + 未定）。候補集合の出発点。
+ * dayOffReasons を渡すと、種別ごとの休み（{ kind: "day-off", reason }）も候補に加える。
+ */
+export function enumerateCellCandidates(
+  workShifts: WorkShift[],
+  dayOffReasons?: readonly string[],
+): ShiftCell[] {
   const cells: ShiftCell[] = workShifts.map((w) => ({
     kind: "work",
     shiftId: w.id,
   }));
   cells.push({ kind: "day-off" });
+  if (dayOffReasons) {
+    for (const reason of dayOffReasons) {
+      cells.push({ kind: "day-off", reason });
+    }
+  }
   cells.push({ kind: "undecided" });
   return cells;
 }
@@ -50,9 +61,10 @@ export function evaluateCellCandidates(
   constraints: ScheduleConstraint[],
   staffId: string,
   day: WorkingDay,
-  workShifts: WorkShift[]
+  workShifts: WorkShift[],
+  dayOffReasons?: readonly string[],
 ): CellCandidateEvaluation[] {
-  const cells = enumerateCellCandidates(workShifts).filter(
+  const cells = enumerateCellCandidates(workShifts, dayOffReasons).filter(
     (cell) => cell.kind !== "undecided"
   );
   const introduced = violationsIntroducedBy(schedule, constraints, staffId, day, cells);
@@ -115,9 +127,10 @@ export function legalCandidatesFor(
   constraints: ScheduleConstraint[],
   staffId: string,
   day: WorkingDay,
-  workShifts: WorkShift[]
+  workShifts: WorkShift[],
+  dayOffReasons?: readonly string[],
 ): ShiftCell[] {
-  return evaluateCellCandidates(schedule, constraints, staffId, day, workShifts)
+  return evaluateCellCandidates(schedule, constraints, staffId, day, workShifts, dayOffReasons)
     .filter((evaluation) => evaluation.blockedBy.length === 0)
     .map((evaluation) => evaluation.cell);
 }

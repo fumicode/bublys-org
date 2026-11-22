@@ -153,19 +153,18 @@ export function createDefaultWorkShiftSet(id: string): WorkShiftSet {
 export function createGovernmentWorkShiftSet(id: string): WorkShiftSet {
   return WorkShiftSet.of(id, [
     // 正規職員の勤務帯
-    WorkShift.of("shift-A", "A勤務", { hour: 8, minute: 0 }),
-    WorkShift.of("shift-B", "B勤務", { hour: 8, minute: 30 }),
-    WorkShift.of("shift-E", "E勤務", { hour: 8, minute: 30 }),
-    
-    WorkShift.of("shift-H", "H勤務", { hour: 8, minute: 30 }),
-    WorkShift.of("shift-h", "h勤務", { hour: 8, minute: 30 }),
+    WorkShift.of("shift-A", "A勤務", { hour: 8, minute: 0 }, { shortName: "A" }),
+    WorkShift.of("shift-B", "B勤務", { hour: 8, minute: 30 }, { shortName: "B" }),
+    WorkShift.of("shift-E", "E勤務", { hour: 8, minute: 30 }, { shortName: "E" }),
+    WorkShift.of("shift-H", "H勤務", { hour: 8, minute: 30 }, { shortName: "H" }),
+    WorkShift.of("shift-h", "h勤務", { hour: 8, minute: 30 }, { shortName: "h" }),
     // 会計年度任用（時短勤務帯）
-    WorkShift.of("shift-①", "①勤務", { hour: 8, minute: 30 }),
-    WorkShift.of("shift-②", "②勤務", { hour: 9, minute: 0 }),
-    WorkShift.of("shift-③", "③勤務", { hour: 10, minute: 15 }),
-    WorkShift.of("shift-④", "④勤務", { hour: 10, minute: 0 }),
-    WorkShift.of("shift-⑤", "⑤勤務", { hour: 10, minute: 30 }),
-    WorkShift.of("shift-⑥", "⑥勤務", { hour: 9, minute: 0 }),
-    WorkShift.of("shift-⑦", "⑦勤務", { hour: 10, minute: 0 }),
+    WorkShift.of("shift-①", "①勤務", { hour: 8, minute: 30 }, { shortName: "①" }),
+    WorkShift.of("shift-②", "②勤務", { hour: 9, minute: 0 }, { shortName: "②" }),
+    WorkShift.of("shift-③", "③勤務", { hour: 10, minute: 15 }, { shortName: "③" }),
+    WorkShift.of("shift-④", "④勤務", { hour: 10, minute: 0 }, { shortName: "④" }),
+    WorkShift.of("shift-⑤", "⑤勤務", { hour: 10, minute: 30 }, { shortName: "⑤" }),
+    WorkShift.of("shift-⑥", "⑥勤務", { hour: 9, minute: 0 }, { shortName: "⑥" }),
+    WorkShift.of("shift-⑦", "⑦勤務", { hour: 10, minute: 0 }, { shortName: "⑦" }),
   ]);
 }

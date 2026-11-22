@@ -169,165 +169,162 @@ export class SymbolMapping {
 
 // ========== 行政版の記号テーブル（形態のデフォルト） ==========
 
-/** 行政版の休暇オプションキー */
-export const GOV_LEAVE_KEYS = {
-  annualLeave: "annual-leave",
-  pmAnnualLeave: "pm-annual-leave",
-  amAnnualLeave: "am-annual-leave",
-  careLeave: "care-leave",
-  specialLeave: "special-leave",
-  dayOff: "day-off",
-} as const;
-
 const want = (optionKey: string): WishOption => ({
   optionKey,
   preference: "want",
 });
 
 export const GOVERNMENT_SYMBOL_ENTRIES: readonly SymbolEntryPlain[] = [
-  // 確定休み
+  // 休みの希望 — optionKey は "day-off:<reason>" 形式（shiftWishOptions の dayOffWishKey と同じ）。
+  // <reason> は DayOffType の shortName に合わせる。
+  // インポート時はすべて希望として読み込む（確定ではない）。シフト作成者が週休・祝日の日にも
+  // 別の勤務帯を入れるケースがあるため。
   {
     symbol: "週",
-    interpretation: { kind: "confirmed-day-off", reason: "weekly" },
+    interpretation: { kind: "wish", options: [want("day-off:週")] },
     label: "週休",
   },
   {
     symbol: "祝",
-    interpretation: { kind: "confirmed-day-off", reason: "holiday" },
+    interpretation: { kind: "wish", options: [want("day-off:祝")] },
     label: "祝日",
   },
-  // 休暇の希望
+  {
+    symbol: "休",
+    interpretation: { kind: "wish", options: [want("day-off:休")] },
+    label: "休暇",
+  },
   {
     symbol: "年",
-    interpretation: { kind: "wish", options: [want(GOV_LEAVE_KEYS.annualLeave)] },
+    interpretation: { kind: "wish", options: [want("day-off:年")] },
     label: "年次有給休暇",
   },
   {
     symbol: "PM年",
-    interpretation: { kind: "wish", options: [want(GOV_LEAVE_KEYS.pmAnnualLeave)] },
+    interpretation: { kind: "wish", options: [want("day-off:PM年")] },
     label: "午後年休",
   },
   {
     symbol: "AM年",
-    interpretation: { kind: "wish", options: [want(GOV_LEAVE_KEYS.amAnnualLeave)] },
+    interpretation: { kind: "wish", options: [want("day-off:AM年")] },
     label: "午前年休",
   },
   {
     symbol: "介護",
-    interpretation: { kind: "wish", options: [want(GOV_LEAVE_KEYS.careLeave)] },
+    interpretation: { kind: "wish", options: [want("day-off:介護")] },
     label: "介護休暇",
   },
   {
     symbol: "特休",
-    interpretation: { kind: "wish", options: [want(GOV_LEAVE_KEYS.specialLeave)] },
+    interpretation: { kind: "wish", options: [want("day-off:特休")] },
     label: "特別休暇",
   },
-  // 勤務帯の希望（単一）
+  // 勤務帯の希望（単一）— optionKey は "work:<勤務帯名>" 形式（shiftWishOptions の workWishKey と同じ）
   {
     symbol: "A",
-    interpretation: { kind: "wish", options: [want("shift-A")] },
+    interpretation: { kind: "wish", options: [want("work:A勤務")] },
     label: "A勤務（8:00〜16:45）",
   },
   {
     symbol: "B",
-    interpretation: { kind: "wish", options: [want("shift-B")] },
+    interpretation: { kind: "wish", options: [want("work:B勤務")] },
     label: "B勤務（8:30〜17:15）",
   },
   {
     symbol: "E",
-    interpretation: { kind: "wish", options: [want("shift-E")] },
+    interpretation: { kind: "wish", options: [want("work:E勤務")] },
     label: "E勤務（土・祝日）",
   },
   {
     symbol: "H",
-    interpretation: { kind: "wish", options: [want("shift-H")] },
+    interpretation: { kind: "wish", options: [want("work:H勤務")] },
     label: "H勤務（8:30〜17:15・週・時間外手当）",
   },
   {
     symbol: "h",
-    interpretation: { kind: "wish", options: [want("shift-h")] },
+    interpretation: { kind: "wish", options: [want("work:h勤務")] },
     label: "h勤務（8:30〜17:15・祝休・時間外手当）",
   },
   // 時短勤務帯の希望（会計年度任用向け）
   {
     symbol: "①",
-    interpretation: { kind: "wish", options: [want("shift-①")] },
+    interpretation: { kind: "wish", options: [want("work:①勤務")] },
     label: "①勤務（8:30〜15:30・平日）",
   },
   {
     symbol: "②",
-    interpretation: { kind: "wish", options: [want("shift-②")] },
+    interpretation: { kind: "wish", options: [want("work:②勤務")] },
     label: "②勤務（9:00〜16:00・平日）",
   },
   {
     symbol: "③",
-    interpretation: { kind: "wish", options: [want("shift-③")] },
+    interpretation: { kind: "wish", options: [want("work:③勤務")] },
     label: "③勤務（10:15〜17:15・平日）",
   },
   {
     symbol: "⑥",
-    interpretation: { kind: "wish", options: [want("shift-⑥")] },
+    interpretation: { kind: "wish", options: [want("work:⑥勤務")] },
     label: "⑥勤務（9:00〜16:00・土祝）",
   },
   {
     symbol: "⑦",
-    interpretation: { kind: "wish", options: [want("shift-⑦")] },
+    interpretation: { kind: "wish", options: [want("work:⑦勤務")] },
     label: "⑦勤務（10:00〜17:00・土祝）",
   },
-  // その他の確定休み
+  // その他の休みの希望
   {
     symbol: "代",
-    interpretation: { kind: "confirmed-day-off", reason: "weekly" },
+    interpretation: { kind: "wish", options: [want("day-off:代")] },
     label: "代休",
   },
   {
     symbol: "公",
-    interpretation: { kind: "confirmed-day-off", reason: "weekly" },
+    interpretation: { kind: "wish", options: [want("day-off:公")] },
     label: "公休",
   },
   {
     symbol: "振",
-    interpretation: { kind: "confirmed-day-off", reason: "holiday" },
+    interpretation: { kind: "wish", options: [want("day-off:振")] },
     label: "振替休日",
   },
   // その他の休暇の希望
   {
     symbol: "研",
-    interpretation: { kind: "wish", options: [want(GOV_LEAVE_KEYS.specialLeave)] },
+    interpretation: { kind: "wish", options: [want("day-off:研修")] },
     label: "研修",
   },
   {
     symbol: "出",
-    interpretation: { kind: "wish", options: [want(GOV_LEAVE_KEYS.specialLeave)] },
+    interpretation: { kind: "wish", options: [want("day-off:出張")] },
     label: "出張",
   },
   // その他の時短勤務帯
   {
     symbol: "④",
-    interpretation: { kind: "wish", options: [want("shift-④")] },
+    interpretation: { kind: "wish", options: [want("work:④勤務")] },
     label: "④勤務",
   },
   {
     symbol: "⑤",
-    interpretation: { kind: "wish", options: [want("shift-⑤")] },
+    interpretation: { kind: "wish", options: [want("work:⑤勤務")] },
     label: "⑤勤務",
   },
   // 曖昧な希望（複数の want）
   {
     symbol: "①ｏｒ②",
-    interpretation: { kind: "wish", options: [want("shift-①"), want("shift-②")] },
+    interpretation: { kind: "wish", options: [want("work:①勤務"), want("work:②勤務")] },
     label: "①または②勤務",
   },
   {
     symbol: "①or②",
-    interpretation: { kind: "wish", options: [want("shift-①"), want("shift-②")] },
+    interpretation: { kind: "wish", options: [want("work:①勤務"), want("work:②勤務")] },
     label: "①または②勤務",
   },
   {
     symbol: "年or週",
     interpretation: {
       kind: "wish",
-      options: [want(GOV_LEAVE_KEYS.annualLeave)],
+      options: [want("day-off:年")],
     },
     label: "年休または週休",
   },

@@ -54,7 +54,7 @@ export function resolveShiftInput(
  */
 export type ShiftSuggestion =
   | { kind: "work"; shift: WorkShift }
-  | { kind: "day-off" }
+  | { kind: "day-off"; reason?: string }
   | { kind: "undecided" };
 
 /** その勤務帯が入力（前方一致）の候補になるか */

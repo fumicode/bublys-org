@@ -47,8 +47,21 @@ export const STAFF_TYPE = "Staff";
 /** 勤務表ごとの「働く人たち」。勤務表が workingStaffGroupId で指す（id=scheduleId） */
 export const WORKING_STAFF_GROUP_TYPE = "WorkingStaffGroup";
 export const WORKSHIFT_SET_TYPE = "WorkShiftSet";
-/** グローバルの勤務帯セット（テンプレート）の固定ID。勤務表作成時にこれをコピーする。 */
-export const GLOBAL_WORKSHIFT_SET_ID = "global";
+/**
+ * グローバルの勤務帯セット（テンプレート）の固定ID。形態ごとに分かれている。
+ * 勤務表作成時にこれをコピーする。
+ * @deprecated 形態を指定して {@link globalWorkShiftSetId} を使う。
+ *   既存の "global" はホテル用として読み替える（互換のため残す）。
+ */
+export const GLOBAL_WORKSHIFT_SET_ID = "global-hotel";
+
+/** 形態ごとのグローバル勤務帯セットID */
+export const globalWorkShiftSetId = (formatId: string): string =>
+  `global-${formatId}`;
+
+/** そのIDがグローバル勤務帯セット（テンプレート）のものか。旧 "global" も含む */
+export const isGlobalWorkShiftSetId = (id: string): boolean =>
+  id.startsWith("global-") || id === "global";
 export const SCHEDULE_TYPE = "Schedule";
 /** 稼働日ごとの予約状況（宿泊人数・部屋数）。勤務表ごとに1つ（id=scheduleId）。 */
 export const SCHEDULE_RESERVATION_INFO_TYPE = "ScheduleReservationInfo";
@@ -142,7 +155,7 @@ export const HOTEL_OBJECTS = defineObjects({
     membership: {
       kind: "live",
       homeScope: (id: string) =>
-        id === GLOBAL_WORKSHIFT_SET_ID ? undefined : localScopeId(SCHEDULE_TYPE, id),
+        isGlobalWorkShiftSetId(id) ? undefined : localScopeId(SCHEDULE_TYPE, id),
     },
   },
   Schedule: {

@@ -9,13 +9,11 @@ import { parseGovernmentShift } from "./GovernmentShiftParser.js";
 import { convertImportData } from "./ShiftImportConverter.js";
 import {
   GOVERNMENT_SYMBOL_MAPPING,
-  GOV_LEAVE_KEYS,
 } from "./SymbolMapping.js";
 import { WorkingDay } from "../schedule/WorkingDay.js";
 import { FourWeekPeriod } from "../schedule/SchedulePeriod.js";
 import { DAY_OFF, type ShiftValue } from "../schedule/ShiftAssignment.js";
 import type { ShiftWishPreference } from "../schedule/StaffMonthlyShiftWish.js";
-import type { ConfirmedDayOffReason } from "./SymbolMapping.js";
 
 // ========== ヘルパー ==========
 
@@ -30,36 +28,36 @@ function buildSimpleInput(): FormatInput {
     { rowNumber: 17, subNumber: 5, name: "Ｍ　Ｙ", staffId: "staff-2" },
   ];
 
-  const confirmedDaysOff = new Map<string, Map<string, ConfirmedDayOffReason>>();
+  const confirmedDaysOff = new Map<string, Map<string, string>>();
   confirmedDaysOff.set("staff-0", new Map([
-    ["2026-10-25", "weekly"],
-    ["2026-10-31", "weekly"],
-    ["2026-11-01", "weekly"],
-    ["2026-11-03", "holiday"],
+    ["2026-10-25", "週"],
+    ["2026-10-31", "週"],
+    ["2026-11-01", "週"],
+    ["2026-11-03", "祝"],
   ]));
   confirmedDaysOff.set("staff-1", new Map([
-    ["2026-10-25", "weekly"],
-    ["2026-10-31", "weekly"],
-    ["2026-11-01", "weekly"],
-    ["2026-11-03", "holiday"],
+    ["2026-10-25", "週"],
+    ["2026-10-31", "週"],
+    ["2026-11-01", "週"],
+    ["2026-11-03", "祝"],
   ]));
   confirmedDaysOff.set("staff-2", new Map([
-    ["2026-10-25", "weekly"],
-    ["2026-10-31", "weekly"],
-    ["2026-11-01", "weekly"],
-    ["2026-11-03", "holiday"],
+    ["2026-10-25", "週"],
+    ["2026-10-31", "週"],
+    ["2026-11-01", "週"],
+    ["2026-11-03", "祝"],
   ]));
 
   const wishes = new Map<string, Map<string, Record<string, ShiftWishPreference>>>();
   wishes.set("staff-1", new Map([
-    ["2026-10-28", { [GOV_LEAVE_KEYS.annualLeave]: "want" }],
-    ["2026-10-29", { [GOV_LEAVE_KEYS.annualLeave]: "want" }],
-    ["2026-11-10", { "shift-B": "want" }],
+    ["2026-10-28", { "day-off:年": "want" }],
+    ["2026-10-29", { "day-off:年": "want" }],
+    ["2026-11-10", { "work:B勤務": "want" }],
   ]));
   wishes.set("staff-2", new Map([
-    ["2026-10-29", { "shift-①": "want", "shift-②": "want" }],
-    ["2026-11-05", { "shift-①": "want", "shift-②": "want" }],
-    ["2026-11-12", { "shift-②": "want" }],
+    ["2026-10-29", { "work:①勤務": "want", "work:②勤務": "want" }],
+    ["2026-11-05", { "work:①勤務": "want", "work:②勤務": "want" }],
+    ["2026-11-12", { "work:②勤務": "want" }],
   ]));
 
   return {
@@ -196,7 +194,7 @@ describe("formatGovernmentShift: 確定した勤務割当", () => {
       staffRows: [{ rowNumber: 1, subNumber: undefined, name: "T　E", staffId: "s1" }],
       shiftValueOf: () => DAY_OFF,
       wishesOf: () => ({}),
-      dayOffReasonOf: () => "weekly",
+      dayOffReasonOf: () => "週",
     };
 
     const grid = formatGovernmentShift(input, GOVERNMENT_SYMBOL_MAPPING);
@@ -215,6 +213,7 @@ describe("formatGovernmentShift: 確定した勤務割当", () => {
       days,
       staffRows: [{ rowNumber: 1, subNumber: undefined, name: "T　E", staffId: "s1" }],
       shiftValueOf: () => "shift-B",
+      shiftNameOf: (id: string) => id === "shift-B" ? "B勤務" : undefined,
       wishesOf: () => ({}),
       dayOffReasonOf: () => undefined,
     };
@@ -274,12 +273,10 @@ describe("ラウンドトリップ（パース → フォーマット → 再パ
     const converted = convertImportData(parsed, mapping, (_name, i) => `staff-${i}`);
 
     // ステップ3: FormatInput を組み立てる（コンバート結果から）
-    const confirmedDaysOffMap = new Map<string, Map<string, ConfirmedDayOffReason>>();
     const wishesMap = new Map<string, Map<string, Record<string, ShiftWishPreference>>>();
 
     for (const sr of converted.staffResults) {
       const staffId = `staff-${converted.staffResults.indexOf(sr)}`;
-      confirmedDaysOffMap.set(staffId, new Map(sr.confirmedDaysOff));
       if (sr.wish) {
         const dayWishes = new Map<string, Record<string, ShiftWishPreference>>();
         for (const day of parsed.days) {
@@ -304,8 +301,7 @@ describe("ラウンドトリップ（パース → フォーマット → 再パ
       })),
       shiftValueOf: () => null,
       wishesOf: (staffId, dayKey) => wishesMap.get(staffId)?.get(dayKey) ?? {},
-      dayOffReasonOf: (staffId, dayKey) =>
-        confirmedDaysOffMap.get(staffId)?.get(dayKey),
+      dayOffReasonOf: () => undefined,
     };
 
     // ステップ4: フォーマット

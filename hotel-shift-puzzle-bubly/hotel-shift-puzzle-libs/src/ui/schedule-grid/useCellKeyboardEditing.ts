@@ -138,7 +138,7 @@ export type CellKeyboardEditing = {
 /** 候補を勤務割当（ShiftCell）へ変換する。 */
 export const suggestionToCell = (s: ShiftSuggestion): ShiftCell => {
   if (s.kind === "work") return { kind: "work", shiftId: s.shift.id };
-  if (s.kind === "day-off") return { kind: "day-off" };
+  if (s.kind === "day-off") return { kind: "day-off", reason: s.reason };
   return { kind: "undecided" };
 };
 

@@ -4,12 +4,10 @@ import { exportShiftToExcel } from "./shiftExcelExport.js";
 import { writeGridToExcel } from "./excelIO.js";
 import {
   GOVERNMENT_SYMBOL_MAPPING,
-  GOV_LEAVE_KEYS,
   WorkingDay,
   type FormatInput,
   type StaffRow,
 } from "@bublys-org/hotel-shift-puzzle-model";
-import type { ConfirmedDayOffReason } from "@bublys-org/hotel-shift-puzzle-model";
 import type { ShiftWishPreference } from "@bublys-org/hotel-shift-puzzle-model";
 
 function buildSampleExcelGrid(): string[][] {
@@ -71,19 +69,20 @@ describe("Excel インポート統合テスト", () => {
     // コンバート結果
     expect(converted.staffResults).toHaveLength(2);
 
-    // W　Ｙ: 週休あり、希望なし
+    // W　Ｙ: 週休・祝日も希望として入る
     const wy = converted.staffResults[0];
     expect(wy.name).toBe("W　Ｙ");
-    expect(wy.confirmedDaysOff.get("2026-10-25")).toBe("weekly");
-    expect(wy.wish!.isEmpty).toBe(true);
+    expect(wy.confirmedDaysOff.size).toBe(0);
+    const day1025 = WorkingDay.of(2026, 10, 25);
+    expect(wy.wish!.preferenceFor(day1025, "day-off:週")).toBe("want");
 
     // Ｓ　Ｅ: 年休 + B勤務の希望
     const se = converted.staffResults[1];
     expect(se.name).toBe("Ｓ　Ｅ");
     const day1028 = WorkingDay.of(2026, 10, 28);
-    expect(se.wish!.preferenceFor(day1028, GOV_LEAVE_KEYS.annualLeave)).toBe("want");
+    expect(se.wish!.preferenceFor(day1028, "day-off:年")).toBe("want");
     const day1110 = WorkingDay.of(2026, 11, 10);
-    expect(se.wish!.preferenceFor(day1110, "shift-B")).toBe("want");
+    expect(se.wish!.preferenceFor(day1110, "work:B勤務")).toBe("want");
   });
 });
 
@@ -99,12 +98,10 @@ describe("Excel ラウンドトリップ（import → export → reimport）", (
     );
 
     // Step 2: FormatInput を組み立てる
-    const confirmedDaysOffMap = new Map<string, Map<string, ConfirmedDayOffReason>>();
     const wishesMap = new Map<string, Map<string, Record<string, ShiftWishPreference>>>();
 
     for (const sr of converted.staffResults) {
       const staffId = `staff-${converted.staffResults.indexOf(sr)}`;
-      confirmedDaysOffMap.set(staffId, new Map(sr.confirmedDaysOff));
       if (sr.wish) {
         const dayWishes = new Map<string, Record<string, ShiftWishPreference>>();
         for (const day of parsed.days) {
@@ -129,8 +126,7 @@ describe("Excel ラウンドトリップ（import → export → reimport）", (
       })),
       shiftValueOf: () => null,
       wishesOf: (staffId, dayKey) => wishesMap.get(staffId)?.get(dayKey) ?? {},
-      dayOffReasonOf: (staffId, dayKey) =>
-        confirmedDaysOffMap.get(staffId)?.get(dayKey),
+      dayOffReasonOf: () => undefined,
     };
 
     // Step 3: エクスポート
@@ -149,13 +145,16 @@ describe("Excel ラウンドトリップ（import → export → reimport）", (
     expect(reconverted.staffResults[0].name).toBe("W　Ｙ");
     expect(reconverted.staffResults[1].name).toBe("Ｓ　Ｅ");
 
-    // 週休が保存されている
-    expect(reconverted.staffResults[0].confirmedDaysOff.get("2026-10-25")).toBe("weekly");
+    // 週休が希望として保存されている
+    const day1025 = WorkingDay.of(2026, 10, 25);
+    expect(
+      reconverted.staffResults[0].wish!.preferenceFor(day1025, "day-off:週"),
+    ).toBe("want");
 
     // 年休の希望が保存されている
     const day1028 = WorkingDay.of(2026, 10, 28);
     expect(
-      reconverted.staffResults[1].wish!.preferenceFor(day1028, GOV_LEAVE_KEYS.annualLeave),
+      reconverted.staffResults[1].wish!.preferenceFor(day1028, "day-off:年"),
     ).toBe("want");
   });
 });

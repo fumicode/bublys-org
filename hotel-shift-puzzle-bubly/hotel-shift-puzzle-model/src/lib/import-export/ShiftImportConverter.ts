@@ -6,7 +6,7 @@
  *
  * 生成するもの:
  *   - StaffMonthlyShiftWish[]: 各スタッフの希望（年休・勤務帯の希望）
- *   - 確定休みの割当情報: 週休・祝日を DAY_OFF として埋めるためのデータ
+ *   - 確定休みの割当情報: 休暇・週休・祝日を DAY_OFF として埋めるためのデータ
  *   - スタッフ名の一覧: WorkingStaffGroup を作るための素材
  *
  * このモジュールは MonthlyStaffSchedule や WorkingStaffGroup を直接作らない。

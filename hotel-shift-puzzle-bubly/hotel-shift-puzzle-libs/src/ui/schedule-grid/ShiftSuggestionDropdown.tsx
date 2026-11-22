@@ -1,8 +1,9 @@
-import { FC } from "react";
+import { FC, useRef, useState } from "react";
 import styled from "styled-components";
 import { Popper } from "@mui/material";
 import type {
   ConstraintViolation,
+  DayOffType,
   ShiftCell,
   ShiftSuggestion,
   WorkShift,
@@ -47,6 +48,8 @@ type ShiftSuggestionDropdownProps = {
   onPick: (s: ShiftSuggestion) => void;
   /** 選択肢の「入れたときのセルの姿」。 */
   faceOf: (s: ShiftSuggestion) => ShiftOptionFace;
+  /** 休みの種別（行政用。空なら種別なし＝ホテル）。ホバーでサブメニューを展開する */
+  dayOffTypes?: readonly DayOffType[];
 };
 
 /**
@@ -70,6 +73,7 @@ export const ShiftSuggestionDropdown: FC<ShiftSuggestionDropdownProps> = ({
   activeIndex,
   onPick,
   faceOf,
+  dayOffTypes,
 }) => (
   <Popper
     open={open && !!anchorEl && suggestions.length > 0}
@@ -78,15 +82,26 @@ export const ShiftSuggestionDropdown: FC<ShiftSuggestionDropdownProps> = ({
     style={{ zIndex: 1300 }}
   >
     <StyledList>
-      {suggestions.map((s, i) => (
-        <ShiftOptionRow
-          key={s.kind === "work" ? s.shift.id : s.kind}
-          suggestion={s}
-          face={faceOf(s)}
-          active={i === activeIndex}
-          onPick={() => onPick(s)}
-        />
-      ))}
+      {suggestions.map((s, i) =>
+        s.kind === "day-off" && dayOffTypes && dayOffTypes.length > 0 ? (
+          <DayOffOptionRow
+            key="day-off"
+            suggestion={s}
+            face={faceOf(s)}
+            active={i === activeIndex}
+            onPick={onPick}
+            dayOffTypes={dayOffTypes}
+          />
+        ) : (
+          <ShiftOptionRow
+            key={s.kind === "work" ? s.shift.id : s.kind}
+            suggestion={s}
+            face={faceOf(s)}
+            active={i === activeIndex}
+            onPick={() => onPick(s)}
+          />
+        )
+      )}
     </StyledList>
   </Popper>
 );
@@ -138,6 +153,108 @@ const ShiftOptionRow: FC<ShiftOptionRowProps> = ({ suggestion: s, face, active, 
     </div>
   );
 };
+
+/** 休み行（ホバーでサブメニューを展開し、種別を選べる） */
+const DayOffOptionRow: FC<{
+  suggestion: ShiftSuggestion;
+  face: ShiftOptionFace;
+  active: boolean;
+  onPick: (s: ShiftSuggestion) => void;
+  dayOffTypes: readonly DayOffType[];
+}> = ({ suggestion, face, active, onPick, dayOffTypes }) => {
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [subOpen, setSubOpen] = useState(false);
+
+  let className = "e-option e-has-sub";
+  if (active) className += " is-active";
+
+  return (
+    <div
+      ref={rowRef}
+      className={className}
+      onMouseEnter={() => setSubOpen(true)}
+      onMouseLeave={() => setSubOpen(false)}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => onPick(suggestion)}
+    >
+      <span className="e-face-frame">
+        <CellFace
+          cell={face.cell}
+          shift={face.shift}
+          wishEntries={face.wishEntries}
+          violationMarks={face.marks}
+          wishViolation={face.wishViolation}
+          cellClassName="is-option-face"
+        />
+      </span>
+      <span className="e-text">
+        <span className="e-name">休み</span>
+        <span className="e-sub-arrow">▸</span>
+      </span>
+      <Popper
+        open={subOpen}
+        anchorEl={rowRef.current}
+        placement="right-start"
+        style={{ zIndex: 1301 }}
+      >
+        <StyledSubMenu
+          onMouseEnter={() => setSubOpen(true)}
+          onMouseLeave={() => setSubOpen(false)}
+        >
+          {dayOffTypes.map((t) => (
+            <div
+              key={t.id}
+              className="e-sub-option"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPick({ kind: "day-off", reason: t.shortName });
+              }}
+            >
+              <span className="e-sub-short">{t.shortName}</span>
+              <span className="e-sub-name">{t.name}</span>
+            </div>
+          ))}
+        </StyledSubMenu>
+      </Popper>
+    </div>
+  );
+};
+
+const StyledSubMenu = styled("div")`
+  margin-left: 2px;
+  min-width: 100px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 3px;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.16), 0 1px 2px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+
+  .e-sub-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    &:hover {
+      background: #e8f0fe;
+    }
+  }
+  .e-sub-short {
+    flex: none;
+    min-width: 32px;
+    font-weight: 600;
+    color: #424242;
+  }
+  .e-sub-name {
+    color: #757575;
+    font-size: 11px;
+  }
+`;
 
 const StyledList = styled.div`
   ${cellFaceStyles}
@@ -250,6 +367,12 @@ const StyledList = styled.div`
     flex: none;
     color: #9e9e9e;
     font-size: 11px;
+  }
+  .e-sub-arrow {
+    flex: none;
+    color: #9e9e9e;
+    font-size: 10px;
+    margin-left: auto;
   }
   .e-violation {
     min-width: 0;

@@ -6,6 +6,7 @@ import {
   WorkShift,
   WorkShiftSet,
   createDefaultWorkShiftSet,
+  createGovernmentWorkShiftSet,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { WorkShiftListView } from "../ui/WorkShiftListView.js";
 import {
@@ -15,22 +16,28 @@ import {
 } from "../objects/repository.js";
 import {
   WORKSHIFT_SET_TYPE,
-  GLOBAL_WORKSHIFT_SET_ID,
+  globalWorkShiftSetId,
 } from "../objects/hotelObjects.js";
 
 /** 新しい勤務帯の ID を生成する */
 const newWorkShiftId = (): string =>
   globalThis.crypto?.randomUUID?.() ?? `shift-${Date.now()}`;
 
+type WorkShiftCollectionProps = {
+  /** 形態ID（"hotel" / "government"）。対応するグローバル勤務帯セットを編集する */
+  formatId?: string;
+};
+
 /**
  * グローバルの勤務帯セット（テンプレート）を編集するバブル。
  * ここで整えた勤務帯が、勤務表作成時にコピーされて各勤務表の独自セットになる。
  * 集約（WorkShiftSet）をシェル経由で編集する（ソートはセットが担保）。
  */
-export const WorkShiftCollection: FC = () => {
+export const WorkShiftCollection: FC<WorkShiftCollectionProps> = ({ formatId = "hotel" }) => {
+  const globalId = globalWorkShiftSetId(formatId);
   const { object: set, update } = useObjectShell<WorkShiftSet>(
     WORKSHIFT_SET_TYPE,
-    GLOBAL_WORKSHIFT_SET_ID
+    globalId,
   );
   const repo = useObjectRepo<WorkShiftSet>(WORKSHIFT_SET_TYPE);
 
@@ -39,8 +46,13 @@ export const WorkShiftCollection: FC = () => {
   const pending = useObjectsPending();
   useEffect(() => {
     if (pending) return;
-    if (!set) repo.save(createDefaultWorkShiftSet(GLOBAL_WORKSHIFT_SET_ID));
-  }, [pending, set, repo]);
+    if (!set) {
+      const defaultSet = formatId === "government"
+        ? createGovernmentWorkShiftSet(globalId)
+        : createDefaultWorkShiftSet(globalId);
+      repo.save(defaultSet);
+    }
+  }, [pending, set, repo, globalId, formatId]);
 
   const shifts = set?.shifts ?? [];
 

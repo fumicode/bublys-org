@@ -121,11 +121,14 @@ const ShiftWishMonthBubble: BubbleRoute["Component"] = ({ bubble }) => {
 const ShiftWishBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const period = periodOfWishParams(bubble.params);
   if (!period) return invalidPeriod;
-  return withObjects(<ShiftWishEditor staffId={bubble.params.staffId} period={period} />);
+  return withObjects(
+    <ShiftWishEditor staffId={bubble.params.staffId} period={period} formatId={availableStoreFormats[0].id} />
+  );
 };
 
 // --- 勤務帯リストバブル（リスト内で追加・編集） ---
-const WorkShiftListBubble: BubbleRoute["Component"] = () => withObjects(<WorkShiftCollection />);
+const WorkShiftListBubble: BubbleRoute["Component"] = () =>
+  withObjects(<WorkShiftCollection formatId={availableStoreFormats[0].id} />);
 
 // --- 制約セットバブル（グローバルのテンプレート。勤務表作成時にコピーされる） ---
 const ConstraintSetBubble: BubbleRoute["Component"] = () =>

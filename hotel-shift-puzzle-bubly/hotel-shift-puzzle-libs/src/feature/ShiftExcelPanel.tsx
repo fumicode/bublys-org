@@ -7,11 +7,13 @@ import {
   Staff,
   StaffMonthlyShiftWish,
   WorkingStaffGroup,
-  type ConfirmedDayOffReason,
+  WorkShiftSet,
   type ShiftWishPreference,
+  type ShiftCell,
   type StaffRow,
   type FormatInput,
 } from "@bublys-org/hotel-shift-puzzle-model";
+import { recordSetCells } from "./recordScheduleEdit.js";
 import { useAppStore } from "@bublys-org/state-management";
 import {
   useObject,
@@ -28,6 +30,7 @@ import {
   STAFF_TYPE,
   WORKING_STAFF_GROUP_TYPE,
   STAFF_SHIFT_WISH_TYPE,
+  WORKSHIFT_SET_TYPE,
 } from "../objects/hotelObjects.js";
 
 export const ShiftExcelPanel: FC<{
@@ -46,6 +49,7 @@ const ShiftExcelPanelInner: FC<{
   const roster = useObjects<Staff>(STAFF_TYPE);
   const staffGroup = useObject<WorkingStaffGroup>(WORKING_STAFF_GROUP_TYPE, scheduleId);
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
+  const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
 
   const staffList = useMemo(
     () => (staffGroup ? staffGroup.resolve(roster) : roster),
@@ -97,6 +101,31 @@ const ShiftExcelPanelInner: FC<{
         }
       }
 
+      // 確定休み（休暇・週休・祝日）を勤務表のセルに書き込む
+      const dayMap = new Map(schedule.workingDays().map((d) => [d.key, d]));
+      const REASON_SHORT: Record<string, string> = { "": "休", weekly: "週", holiday: "祝" };
+      const dayOffChanges: { staffId: string; day: WorkingDay; to: ShiftCell }[] = [];
+      for (const result of converted.staffResults) {
+        const staffId = staffByName.get(result.name) ?? `imported-${result.name}`;
+        for (const [dayKey, reason] of result.confirmedDaysOff) {
+          const day = dayMap.get(dayKey);
+          if (day) {
+            dayOffChanges.push({
+              staffId,
+              day,
+              to: { kind: "day-off", reason: REASON_SHORT[reason] ?? reason },
+            });
+          }
+        }
+      }
+      let updatedSchedule = schedule;
+      if (dayOffChanges.length > 0) {
+        updatedSchedule = recordSetCells(store, {
+          schedule: updatedSchedule,
+          changes: dayOffChanges,
+        });
+      }
+
       // 希望を保存（external なので世界線とは別に保存）
       let savedCount = 0;
       for (const result of converted.staffResults) {
@@ -122,6 +151,9 @@ const ShiftExcelPanelInner: FC<{
       }
 
       let summary = `${staffCount}名のスタッフを読み込み、${savedCount}名の希望を保存しました。`;
+      if (dayOffChanges.length > 0) {
+        summary += ` 確定休み${dayOffChanges.length}件を反映しました。`;
+      }
       if (unmatchedNames.length > 0) {
         summary += ` 臨時スタッフとして追加: ${unmatchedNames.join("、")}。`;
       }
@@ -164,7 +196,7 @@ const ShiftExcelPanelInner: FC<{
         staffId: s.id,
       }));
 
-      const confirmedDaysOff = new Map<string, Map<string, ConfirmedDayOffReason>>();
+      const confirmedDaysOff = new Map<string, Map<string, string>>();
 
       const formatInput: FormatInput = {
         title: `${schedule.state.period.label}　シフト`,
@@ -185,6 +217,8 @@ const ShiftExcelPanelInner: FC<{
         },
         dayOffReasonOf: (staffId, dayKey) =>
           confirmedDaysOff.get(staffId)?.get(dayKey),
+        shiftNameOf: (shiftId: string) =>
+          workShiftSet?.shifts.find((s) => s.id === shiftId)?.name,
       };
 
       downloadShiftExcel(formatInput);
@@ -197,7 +231,7 @@ const ShiftExcelPanelInner: FC<{
     } finally {
       setBusy(false);
     }
-  }, [schedule, staffList, allWishes]);
+  }, [schedule, staffList, allWishes, workShiftSet]);
 
   return (
     <ShiftExcelView

@@ -1,54 +1,60 @@
 import { describe, it, expect } from "vitest";
 import {
   GOVERNMENT_SYMBOL_MAPPING,
-  GOV_LEAVE_KEYS,
   SymbolMapping,
 } from "./SymbolMapping.js";
 
 describe("GOVERNMENT_SYMBOL_MAPPING", () => {
   const mapping = GOVERNMENT_SYMBOL_MAPPING;
 
-  describe("確定休み", () => {
-    it("「週」は週休として確定休み", () => {
+  describe("休みの希望", () => {
+    it("「週」は週休の希望（day-off:週）", () => {
       const result = mapping.interpret("週");
-      expect(result).toEqual({ kind: "confirmed-day-off", reason: "weekly" });
+      expect(result).toEqual({
+        kind: "wish",
+        options: [{ optionKey: "day-off:週", preference: "want" }],
+      });
     });
 
-    it("「祝」は祝日として確定休み", () => {
+    it("「祝」は祝日の希望（day-off:祝）", () => {
       const result = mapping.interpret("祝");
-      expect(result).toEqual({ kind: "confirmed-day-off", reason: "holiday" });
+      expect(result).toEqual({
+        kind: "wish",
+        options: [{ optionKey: "day-off:祝", preference: "want" }],
+      });
     });
 
-    it("isConfirmedDayOff で判定できる", () => {
-      expect(mapping.isConfirmedDayOff("週")).toBe(true);
-      expect(mapping.isConfirmedDayOff("祝")).toBe(true);
-      expect(mapping.isConfirmedDayOff("年")).toBe(false);
-      expect(mapping.isConfirmedDayOff("B")).toBe(false);
+    it("「休」は休暇の希望（day-off:休）", () => {
+      const result = mapping.interpret("休");
+      expect(result).toEqual({
+        kind: "wish",
+        options: [{ optionKey: "day-off:休", preference: "want" }],
+      });
     });
   });
 
   describe("休暇の希望", () => {
-    it("「年」は年次有給休暇の希望", () => {
+    it("「年」は年休の希望（day-off:年）", () => {
       const result = mapping.interpret("年");
       expect(result).toEqual({
         kind: "wish",
-        options: [{ optionKey: GOV_LEAVE_KEYS.annualLeave, preference: "want" }],
+        options: [{ optionKey: "day-off:年", preference: "want" }],
       });
     });
 
-    it("「PM年」は午後年休の希望", () => {
+    it("「PM年」は午後年休の希望（day-off:PM年）", () => {
       const result = mapping.interpret("PM年");
       expect(result).toEqual({
         kind: "wish",
-        options: [{ optionKey: GOV_LEAVE_KEYS.pmAnnualLeave, preference: "want" }],
+        options: [{ optionKey: "day-off:PM年", preference: "want" }],
       });
     });
 
-    it("「介護」は介護休暇の希望", () => {
+    it("「介護」は介護休暇の希望（day-off:介護）", () => {
       const result = mapping.interpret("介護");
       expect(result).toEqual({
         kind: "wish",
-        options: [{ optionKey: GOV_LEAVE_KEYS.careLeave, preference: "want" }],
+        options: [{ optionKey: "day-off:介護", preference: "want" }],
       });
     });
   });
@@ -58,7 +64,7 @@ describe("GOVERNMENT_SYMBOL_MAPPING", () => {
       const result = mapping.interpret("B");
       expect(result).toEqual({
         kind: "wish",
-        options: [{ optionKey: "shift-B", preference: "want" }],
+        options: [{ optionKey: "work:B勤務", preference: "want" }],
       });
     });
 
@@ -66,7 +72,7 @@ describe("GOVERNMENT_SYMBOL_MAPPING", () => {
       const result = mapping.interpret("①");
       expect(result).toEqual({
         kind: "wish",
-        options: [{ optionKey: "shift-①", preference: "want" }],
+        options: [{ optionKey: "work:①勤務", preference: "want" }],
       });
     });
   });
@@ -77,8 +83,8 @@ describe("GOVERNMENT_SYMBOL_MAPPING", () => {
       expect(result).toEqual({
         kind: "wish",
         options: [
-          { optionKey: "shift-①", preference: "want" },
-          { optionKey: "shift-②", preference: "want" },
+          { optionKey: "work:①勤務", preference: "want" },
+          { optionKey: "work:②勤務", preference: "want" },
         ],
       });
     });
@@ -88,8 +94,8 @@ describe("GOVERNMENT_SYMBOL_MAPPING", () => {
       expect(result).toEqual({
         kind: "wish",
         options: [
-          { optionKey: "shift-①", preference: "want" },
-          { optionKey: "shift-②", preference: "want" },
+          { optionKey: "work:①勤務", preference: "want" },
+          { optionKey: "work:②勤務", preference: "want" },
         ],
       });
     });
@@ -116,20 +122,20 @@ describe("GOVERNMENT_SYMBOL_MAPPING", () => {
   });
 
   describe("逆引き", () => {
-    it("週休の記号を逆引き", () => {
-      expect(mapping.symbolForDayOff("weekly")).toBe("週");
+    it("週休の希望キーの記号を逆引き", () => {
+      expect(mapping.symbolForWish("day-off:週")).toBe("週");
     });
 
-    it("祝日の記号を逆引き", () => {
-      expect(mapping.symbolForDayOff("holiday")).toBe("祝");
+    it("祝日の希望キーの記号を逆引き", () => {
+      expect(mapping.symbolForWish("day-off:祝")).toBe("祝");
     });
 
-    it("年休オプションキーの記号を逆引き", () => {
-      expect(mapping.symbolForWish(GOV_LEAVE_KEYS.annualLeave)).toBe("年");
+    it("年休の希望キーの記号を逆引き", () => {
+      expect(mapping.symbolForWish("day-off:年")).toBe("年");
     });
 
     it("B勤務のオプションキーの記号を逆引き", () => {
-      expect(mapping.symbolForWish("shift-B")).toBe("B");
+      expect(mapping.symbolForWish("work:B勤務")).toBe("B");
     });
   });
 
@@ -138,7 +144,7 @@ describe("GOVERNMENT_SYMBOL_MAPPING", () => {
       const result = mapping.interpret(" B ");
       expect(result).toEqual({
         kind: "wish",
-        options: [{ optionKey: "shift-B", preference: "want" }],
+        options: [{ optionKey: "work:B勤務", preference: "want" }],
       });
     });
   });
@@ -181,7 +187,10 @@ describe("GOVERNMENT_SYMBOL_MAPPING", () => {
       const entry = updated.entries.find((e) => e.symbol === "週");
       expect(entry?.label).toBe("定休日");
       // 解釈は変わらない
-      expect(updated.interpret("週")).toEqual({ kind: "confirmed-day-off", reason: "weekly" });
+      expect(updated.interpret("週")).toEqual({
+        kind: "wish",
+        options: [{ optionKey: "day-off:週", preference: "want" }],
+      });
     });
   });
 

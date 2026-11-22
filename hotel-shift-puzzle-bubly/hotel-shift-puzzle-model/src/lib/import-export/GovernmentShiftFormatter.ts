@@ -11,7 +11,7 @@ import { WorkingDay } from "../schedule/WorkingDay.js";
 import { DAY_OFF, type ShiftValue } from "../schedule/ShiftAssignment.js";
 import type { ShiftWishPreference } from "../schedule/StaffMonthlyShiftWish.js";
 import type { SchedulePeriod } from "../schedule/SchedulePeriod.js";
-import type { SymbolMapping, ConfirmedDayOffReason } from "./SymbolMapping.js";
+import type { SymbolMapping } from "./SymbolMapping.js";
 
 // ========== 和暦生成 ==========
 
@@ -43,8 +43,10 @@ export type FormatInput = {
   shiftValueOf: (staffId: string, dayKey: string) => ShiftValue;
   /** その日のシフト希望を返す（feature層が注入） */
   wishesOf: (staffId: string, dayKey: string) => Record<string, ShiftWishPreference>;
-  /** 確定休みの理由（週休か祝日か）を返す（feature層が注入） */
-  dayOffReasonOf: (staffId: string, dayKey: string) => ConfirmedDayOffReason | undefined;
+  /** 確定休みの短縮名（"週" / "祝" / "休" 等）を返す（feature層が注入） */
+  dayOffReasonOf: (staffId: string, dayKey: string) => string | undefined;
+  /** 勤務帯ID → 勤務帯名（エクスポート時の逆引きに使う。省略時は shiftId をそのまま返す） */
+  shiftNameOf?: (shiftId: string) => string | undefined;
 };
 
 // ========== フォーマッタ ==========
@@ -183,20 +185,22 @@ function cellValueFor(
   if (shiftValue === DAY_OFF) {
     const reason = input.dayOffReasonOf(staffId, dayKey);
     if (reason) {
-      return mapping.symbolForDayOff(reason) ?? "";
+      return mapping.symbolForWish(`day-off:${reason}`) ?? reason;
     }
     return "";
   }
 
   if (shiftValue !== null) {
-    // 勤務帯ID → 記号の逆引き
-    return mapping.symbolForWish(shiftValue) ?? shiftValue;
+    // 勤務帯ID → option key ("work:<name>") → 記号の逆引き
+    const shiftName = input.shiftNameOf?.(shiftValue);
+    const optionKey = shiftName ? `work:${shiftName}` : undefined;
+    return (optionKey && mapping.symbolForWish(optionKey)) ?? shiftValue;
   }
 
   // 未定の場合、確定休みを見る
   const dayOffReason = input.dayOffReasonOf(staffId, dayKey);
   if (dayOffReason) {
-    return mapping.symbolForDayOff(dayOffReason) ?? "";
+    return mapping.symbolForWish(`day-off:${dayOffReason}`) ?? dayOffReason;
   }
 
   // 希望を見る

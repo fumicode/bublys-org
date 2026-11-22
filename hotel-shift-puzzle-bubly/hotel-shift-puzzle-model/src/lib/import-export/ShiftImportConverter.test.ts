@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { convertImportData } from "./ShiftImportConverter.js";
 import {
   GOVERNMENT_SYMBOL_MAPPING,
-  GOV_LEAVE_KEYS,
 } from "./SymbolMapping.js";
 import type { GovernmentShiftImportData } from "./GovernmentShiftParser.js";
 import { WorkingDay } from "../schedule/WorkingDay.js";
@@ -87,18 +86,25 @@ describe("convertImportData", () => {
       expect(wy().name).toBe("W　Ｙ");
     });
 
-    it("週休は確定休み", () => {
-      expect(wy().confirmedDaysOff.get("2026-10-25")).toBe("weekly");
-      expect(wy().confirmedDaysOff.get("2026-10-31")).toBe("weekly");
+    it("週休は希望として入る", () => {
+      const wish = wy().wish!;
+      const day = WorkingDay.of(2026, 10, 25);
+      expect(wish.preferenceFor(day, "day-off:週")).toBe("want");
     });
 
-    it("祝日は確定休み", () => {
-      expect(wy().confirmedDaysOff.get("2026-11-03")).toBe("holiday");
+    it("祝日は希望として入る", () => {
+      const wish = wy().wish!;
+      const day = WorkingDay.of(2026, 11, 3);
+      expect(wish.preferenceFor(day, "day-off:祝")).toBe("want");
     });
 
-    it("希望は空（空欄しかない）", () => {
+    it("確定休みはない（すべて希望として読み込む）", () => {
+      expect(wy().confirmedDaysOff.size).toBe(0);
+    });
+
+    it("希望がある（週休3日＋祝日1日）", () => {
       expect(wy().wish).toBeDefined();
-      expect(wy().wish!.isEmpty).toBe(true);
+      expect(wy().wish!.filledDayCount).toBe(4);
     });
 
     it("未知の記号はない", () => {
@@ -112,17 +118,17 @@ describe("convertImportData", () => {
     it("年休は希望として入る", () => {
       const wish = se().wish!;
       const day = WorkingDay.of(2026, 10, 28);
-      expect(wish.preferenceFor(day, GOV_LEAVE_KEYS.annualLeave)).toBe("want");
+      expect(wish.preferenceFor(day, "day-off:年")).toBe("want");
     });
 
     it("B勤務も希望として入る", () => {
       const wish = se().wish!;
       const day = WorkingDay.of(2026, 11, 10);
-      expect(wish.preferenceFor(day, "shift-B")).toBe("want");
+      expect(wish.preferenceFor(day, "work:B勤務")).toBe("want");
     });
 
-    it("2日分の希望がある", () => {
-      expect(se().wish!.filledDayCount).toBe(3); // 年×2 + B×1
+    it("7日分の希望がある", () => {
+      expect(se().wish!.filledDayCount).toBe(7); // 週×3 + 祝×1 + 年×2 + B×1
     });
   });
 
@@ -132,15 +138,15 @@ describe("convertImportData", () => {
     it("①or② は ①と② 両方の want になる", () => {
       const wish = my().wish!;
       const day = WorkingDay.of(2026, 10, 29);
-      expect(wish.preferenceFor(day, "shift-①")).toBe("want");
-      expect(wish.preferenceFor(day, "shift-②")).toBe("want");
+      expect(wish.preferenceFor(day, "work:①勤務")).toBe("want");
+      expect(wish.preferenceFor(day, "work:②勤務")).toBe("want");
     });
 
     it("② 単独は ② だけの want", () => {
       const wish = my().wish!;
       const day = WorkingDay.of(2026, 11, 12);
-      expect(wish.preferenceFor(day, "shift-②")).toBe("want");
-      expect(wish.preferenceFor(day, "shift-①")).toBeUndefined();
+      expect(wish.preferenceFor(day, "work:②勤務")).toBe("want");
+      expect(wish.preferenceFor(day, "work:①勤務")).toBeUndefined();
     });
 
     it("会計年度任用のサブ番号を持つ", () => {

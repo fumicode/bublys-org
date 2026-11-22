@@ -38,11 +38,12 @@ export const fulfillWishesStep: AutoShiftStep = {
         if (!result.isUndecided(staffId, day)) continue; // 人間入力は守る
         const pref = ctx.preferenceOf(staffId, day);
         if (pref.kind === "day-off") {
-          if (!canPlace(ctx, result, staffId, day, { kind: "day-off" })) {
+          const dayOffCell = { kind: "day-off" as const, reason: pref.reason };
+          if (!canPlace(ctx, result, staffId, day, dayOffCell)) {
             blocked++;
             continue;
           }
-          result = result.assignDayOff(staffId, day);
+          result = result.assignDayOff(staffId, day, pref.reason);
           assigned++;
         } else if (pref.kind === "work") {
           // この勤務表が使う帯でなければ人間へ（希望の読み違いであって、制約の話ではない）
