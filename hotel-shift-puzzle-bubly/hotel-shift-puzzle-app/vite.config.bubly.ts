@@ -35,12 +35,16 @@ export default defineConfig({
       // 共有依存関係は外部化（ホストアプリから提供される）
       // hotel-shift-puzzle-libs と hotel-shift-puzzle-model はバンドルに含める（完全分離のため）
       external: (id) => {
-        // hotel-shift-puzzle-libs と hotel-shift-puzzle-model はバンドルに含める
+        // hotel-shift-puzzle-libs と hotel-shift-puzzle-model はバンドルに含める。
+        // 暦のモデル（koyomi-model。六曜）も含める ── OS は持っていないので、外部化すると
+        // OS に読み込んだときに六曜が引けない（#235）
         if (
           id === "@bublys-org/hotel-shift-puzzle-libs" ||
           id.startsWith("@bublys-org/hotel-shift-puzzle-libs/") ||
           id === "@bublys-org/hotel-shift-puzzle-model" ||
-          id.startsWith("@bublys-org/hotel-shift-puzzle-model/")
+          id.startsWith("@bublys-org/hotel-shift-puzzle-model/") ||
+          id === "@bublys-org/koyomi-model" ||
+          id.startsWith("@bublys-org/koyomi-model/")
         ) {
           return false;
         }

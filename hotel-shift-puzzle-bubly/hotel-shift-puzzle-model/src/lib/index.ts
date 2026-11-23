@@ -10,6 +10,9 @@ export * from './store/Store.js';
 // Staff（スタッフ）
 export * from './staff/Staff.js';
 export * from './staff/DayOffStyle.js';
+export * from './staff/EmojiTag.js';
+// スタッフプロファイル（絵文字タグ＋組み込みの表示を束ねる。#236）
+export * from './staff/StaffProfile.js';
 // 勤務スタッフ群（勤務表とスタッフの間の入れ物。名簿から来た人と臨時の人を区別する）
 export * from './staff/WorkingStaffMember.js';
 export * from './staff/WorkingStaffGroup.js';

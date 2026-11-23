@@ -4,7 +4,7 @@ import React, { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { WorldLineGraph } from '../domain/WorldLineGraph.js';
 import { computeTreeLayout } from './treeLayout.js';
 import { computeOrganicTree, OrganicEdge } from './organicTree.js';
-import { MILESTONE_COLOR, milestoneFlagShape } from './milestoneMark.js';
+import { MILESTONE_COLOR, MILESTONE_RING_RADIUS_OFFSET, milestoneFlagShape } from './milestoneMark.js';
 
 // ============================================================================
 // Types
@@ -185,7 +185,19 @@ export const WorldLineTreeView: FC<WorldLineTreeViewProps> = ({
               )}
 
               {milestoneNodeIds?.has(id) && (
-                <MilestoneFlag x={node.x} y={node.y} r={NODE_RADIUS} style={fadeStyle} />
+                <>
+                  <circle
+                    cx={node.x}
+                    cy={node.y}
+                    r={NODE_RADIUS * 0.6 + MILESTONE_RING_RADIUS_OFFSET}
+                    fill="none"
+                    stroke={MILESTONE_COLOR}
+                    strokeWidth={1.5}
+                    strokeOpacity={0.7}
+                    style={fadeStyle}
+                  />
+                  <MilestoneFlag x={node.x} y={node.y} r={NODE_RADIUS} style={fadeStyle} />
+                </>
               )}
 
               {/* クリック当たり判定（装飾の見た目に関わらず一定サイズを確保） */}

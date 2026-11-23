@@ -24,6 +24,7 @@ import {
   ScheduleReservationInfoDetail,
   ExtractedSchedule,
   HotelObjectsProvider,
+  ConfirmedReviewPanel,
   ScheduleWorldLineView,
   ScheduleWorldLineTreeView,
   WorkingStaffPanel,
@@ -50,6 +51,8 @@ import {
   shiftWishPeriodUrl,
   periodOfWishParams,
   scheduleStaffDetailUrl,
+  scheduleReviewUrl,
+  scheduleUrl,
 } from "./bubbleUrls.js";
 
 // 全バブルは統一リポジトリ（アプリ全体の世界線スコープ）にアクセスするため、
@@ -147,8 +150,8 @@ const createCandidatesWorker = () =>
   });
 
 // --- 月間スタッフ勤務表バブル（グリッド + 可能勤務帯 / 世界線 / 自動シフトへのリンク） ---
-// 世界線ビュー・キセキの木は、それぞれ独立したボタンから勤務表バブルを opener にして
-// 単独で開く。確定版の振り返りはバブルを持たず、勤務表の中に出る（#231）。
+// 世界線ビュー・キセキの木・振り返りは、それぞれ独立したボタンから勤務表バブルを opener にして
+// 単独で開く。振り返りは ScheduleReviewBubble で独立バブルとして開く（#231）。
 const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble, isOpen, bringToFront } = useContext(BubblesContext);
   const scheduleId = bubble.params.scheduleId;
@@ -163,6 +166,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   // 抽出はクリックした要素（バッジ／抽出ボタン）の近くに出したいので origin-side で開く
   const openOrigin = (url: string) => openBubble(url, bubble.id, "origin-side");
   const treeUrl = scheduleWorldLineTreeUrl(scheduleId);
+  const rvUrl = scheduleReviewUrl(scheduleId);
   // 世界線ビューは勤務表に1つあれば足りる。すでに開いていれば新しく開かず、最前面へ出す
   // （何も起きないと押した手応えが無い）。解決案生成のあとの自動展開も、
   // ボタンのダブルクリックも、この1箇所を通る。
@@ -192,7 +196,18 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
       }
       reservationInfoUrl={scheduleReservationInfoUrl(scheduleId)}
       createCandidatesWorker={createCandidatesWorker}
+      reviewUrl={rvUrl}
+      onOpenReview={() => openSide(rvUrl, "bubble-side-right")}
+      precedingReviewUrl={scheduleReviewUrl}
     />
+  );
+};
+
+// --- 振り返りバブル（確定版の振り返りを独立したバブルとして開く） ---
+const ScheduleReviewBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const sid = bubble.params.scheduleId;
+  return withObjects(
+    <ConfirmedReviewPanel scheduleId={sid} scheduleUrl={scheduleUrl(sid)} />
   );
 };
 
@@ -206,9 +221,6 @@ const ExtractedScheduleBubble: BubbleRoute["Component"] = ({ bubble }) =>
     <ExtractedSchedule
       scheduleId={bubble.params.scheduleId}
       staffIds={(bubble.params.staffIds ?? "").split(",").filter(Boolean)}
-      staffBubbleUrl={(staffId) =>
-        scheduleStaffDetailUrl(bubble.params.scheduleId, staffId)
-      }
     />
   );
 
@@ -361,6 +373,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/staff", type: "schedule-staff", Component: WorkingStaffBubble, bubbleOptions: { defaultSize: { width: 620, height: 440 } } },
   // 抽出バブルはフロストガラス調：背景を半透明にして裏がうっすら見えるようにする（ぼかしは中で付与）
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/extract/:staffIds", type: "schedule-extract", Component: ExtractedScheduleBubble, bubbleOptions: { contentBackground: "hsla(0, 0%, 100%, 0.5)" } },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/review", type: "schedule-review", Component: ScheduleReviewBubble, bubbleOptions: { defaultSize: { width: 600, height: 500 } } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/violations/:violationKey", type: "schedule-violation", Component: ScheduleViolationBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/days/:dayKey", type: "schedule-day", Component: ScheduleDayBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/reservation-info", type: "schedule-reservation-info", Component: ScheduleReservationInfoBubble },

@@ -19,10 +19,9 @@ import {
   previewCellValues,
   type CellValuePreview,
   type StarEntry,
-  type DayOffStyle,
+  type StaffProfile,
 } from "../domain/index.js";
 import {
-  STAFF_COL_WIDTH,
   STAFF_COL_WIDTH_COMPACT,
   DAY_COL_WIDTH,
   PREV_COL_WIDTH,
@@ -32,6 +31,7 @@ import {
   DEMAND_CELL_KEY_PREFIX,
   requiredCellKey,
 } from "./schedule-grid/constants.js";
+import { DAY_NOTE_COLOR, type DayNote } from "./schedule-grid/cellSymbols.js";
 import { StyledWrap } from "./schedule-grid/styles.js";
 import { wishEntriesFor } from "./schedule-grid/wishSummary.js";
 import { buildSummaryRows } from "./schedule-grid/summaryModel.js";
@@ -108,6 +108,11 @@ type ScheduleGridViewProps = {
   leaderRules?: ShiftLeaderRule[];
   /** true なら footer を責任者ルールの ◯/✕ 行だけにする（必要人数・休み行を出さない）。抽出ビュー用 */
   leaderRulesOnlyFooter?: boolean;
+  /**
+   * 日付に添える注記（六曜など）。渡すと日付の見出しの下に小さく出す。何を添えるかは
+   * feature 層が決める（表は中身を知らない）。省略すると何も添えない
+   */
+  dayNoteOf?: (day: WorkingDay) => DayNote | undefined;
   /** 前月の確定版から引き継いだ★。渡すと、スコアのある人の名前の横に出す（＝休みの優先度） */
   inheritedScores?: readonly StarEntry[];
   /**
@@ -162,8 +167,11 @@ type ScheduleGridViewProps = {
   candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
   /** 休みのセルの役目の説明。セルに触れたときに title で出す */
   dayOffReasonOf?: (staffId: string, day: WorkingDay) => string | undefined;
-  /** その人がこの勤務表で使う休みの形。渡されたら名前の横に印を出す */
-  dayOffStyleOf?: (staffId: string) => DayOffStyle;
+  /**
+   * その人のスタッフプロファイル（#236）。名前の横の記号（🔰・責任者・休みの形…）はこれから描く。
+   * 渡さなければ名前の横には何も出さない
+   */
+  profileOf?: (staffId: string) => StaffProfile;
   /**
    * 候補が1つに絞られた未定セルの、その値（確定提案）。無ければ undefined。
    * セルに薄く描かれ、何も打っていないときの Enter（下の次の提案へ）/ Tab（右の次の提案へ）で承認できる。
@@ -252,8 +260,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   clipboard,
   constraints,
   candidateHintOf,
+  dayNoteOf,
   dayOffReasonOf,
-  dayOffStyleOf,
+  profileOf,
   forcedCellOf,
   isDeadCell,
   onApproveForced,
@@ -518,8 +527,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   const precedingDays = precedingTail?.days ?? [];
   const precedingCols =
     precedingDays.length > 0 ? `repeat(${precedingDays.length}, ${PREV_COL_WIDTH}px) ` : "";
-  const staffColWidth = compact ? STAFF_COL_WIDTH_COMPACT : STAFF_COL_WIDTH;
-  const gridTemplateColumns = `${staffColWidth}px ${precedingCols}repeat(${days.length}, ${DAY_COL_WIDTH}px) ${OFF_COL_WIDTH}px ${EARLY_COL_WIDTH}px`;
+  const staffCol = compact ? `${STAFF_COL_WIDTH_COMPACT}px` : "max-content";
+  const gridTemplateColumns = `${staffCol} ${precedingCols}repeat(${days.length}, ${DAY_COL_WIDTH}px) ${OFF_COL_WIDTH}px ${EARLY_COL_WIDTH}px`;
   // スタッフ列の右から、前月の列＋日列＋休＋早までを覆う span（部署セパレータ・予約トグル帯）
   const daysThroughSummarySpan = `2 / ${precedingDays.length + days.length + 4}`;
 
@@ -546,7 +555,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           violationUrl={violationUrl}
           selected={selectedStaffIds?.has(staff.id)}
           onToggleSelected={onToggleStaffSelected}
-          leaderRules={leaderRules}
+          profile={profileOf?.(staff.id)}
           onSelectRule={onSelectRule}
           inheritedScores={inheritedScores}
           staffUrl={staffUrlOf?.(staff.id)}
@@ -558,7 +567,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           earlyShiftIds={earlyShiftIds}
           candidateHintOf={candidateHintOf}
           dayOffReasonOf={dayOffReasonOf}
-          dayOffStyle={dayOffStyleOf?.(staff.id)}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
         />
@@ -598,7 +606,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           violationUrl={violationUrl}
           selected={selectedStaffIds?.has(staff.id)}
           onToggleSelected={onToggleStaffSelected}
-          leaderRules={leaderRules}
+          profile={profileOf?.(staff.id)}
           onSelectRule={onSelectRule}
           inheritedScores={inheritedScores}
           staffUrl={staffUrlOf?.(staff.id)}
@@ -610,7 +618,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           earlyShiftIds={earlyShiftIds}
           candidateHintOf={candidateHintOf}
           dayOffReasonOf={dayOffReasonOf}
-          dayOffStyle={dayOffStyleOf?.(staff.id)}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
         />
@@ -685,17 +692,27 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         {days.map((day) => {
           const wd = day.weekday; // 0=日 6=土
           const warns = dayWarnings.get(day.key);
+          const note = dayNoteOf?.(day);
           const inner = (
             <span
               className="e-day-inner"
               // 違反マーク（⚠）は嵩張るのでヘッダ色だけで示し、理由は title で読めるようにする
               title={[
                 ...(warns ? warns.map((v) => v.message) : []),
+                ...(note?.title ? [note.title] : []),
                 `${day.label} の詳細を開く（ダブルクリック）`,
               ].join("\n")}
             >
               <span className="e-day-num">{day.day}</span>
               <span className="e-day-wd">{["日", "月", "火", "水", "木", "金", "土"][wd]}</span>
+              {note && (
+                <span
+                  className="e-day-note"
+                  style={note.tone ? { color: DAY_NOTE_COLOR[note.tone] } : undefined}
+                >
+                  {note.label}
+                </span>
+              )}
             </span>
           );
           return (

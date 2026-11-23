@@ -36,6 +36,7 @@ export * from "./shiftWishMonths.js";
 export * from "./autoShift.js";
 export * from "./buildReview.js";
 export * from "./ConfirmedReview.js";
+export * from "./ConfirmedReviewPanel.js";
 export * from "./confirmedVersion.js";
 export * from "./starPriority.js";
 export * from "./staffReviews.js";

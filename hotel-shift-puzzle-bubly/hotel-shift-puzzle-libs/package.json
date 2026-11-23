@@ -28,6 +28,7 @@
   "dependencies": {
     "tslib": "^2.3.0",
     "@bublys-org/hotel-shift-puzzle-model": "*",
+    "@bublys-org/koyomi-model": "*",
     "@bublys-org/bubbles-ui": "*",
     "@bublys-org/state-management": "*",
     "@bublys-org/world-line-graph": "*",

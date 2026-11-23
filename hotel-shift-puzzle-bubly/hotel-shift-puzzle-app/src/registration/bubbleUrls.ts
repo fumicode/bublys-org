@@ -64,6 +64,10 @@ export const periodOfWishParams = (params: Record<string, string>): SchedulePeri
   return CalendarMonthPeriod.of(year, month);
 };
 
+/** 振り返りバブル（確定版の振り返りを独立したバブルで開く） */
+export const scheduleReviewUrl = (scheduleId: string): string =>
+  `hotel-shift-puzzle/schedules/${scheduleId}/review`;
+
 /** 月間勤務表バブル */
 export const scheduleUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}`;

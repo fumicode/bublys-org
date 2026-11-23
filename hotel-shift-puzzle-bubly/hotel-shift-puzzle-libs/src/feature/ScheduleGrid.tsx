@@ -32,6 +32,7 @@ import {
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
+import { staffProfileResolver, useGlobalStaffById } from "./staffProfile.js";
 import { useIsNarrow } from "../ui/useIsNarrow.js";
 import type { CellChange, CellSelection } from "../ui/schedule-grid/types.js";
 import {
@@ -65,6 +66,7 @@ import { prioritizeStaffByStars } from "./starPriority.js";
 import { buildReview } from "./buildReview.js";
 import { useStore } from "./useStore.js";
 import { wishesOfPeriod } from "./shiftWishMonths.js";
+import { rokuyoNoteOf } from "./rokuyoNote.js";
 import {
   captureInheritance,
   confirmedAtOf,
@@ -72,8 +74,8 @@ import {
   pendingInheritanceOf,
   precedingConfirmedOf,
 } from "./precedingMonth.js";
-import { versionLabelFor } from "./versionLabel.js";
 import { ConfirmedReview } from "./ConfirmedReview.js";
+import { versionLabelFor } from "./versionLabel.js";
 import { useConfirmedVersion } from "./confirmedVersion.js";
 import { useScheduleHistory } from "./useScheduleHistory.js";
 import { scheduleUndoBindings } from "./scheduleWorldLineKeys.js";
@@ -157,6 +159,12 @@ type ScheduleGridProps = {
    * 注入する（URL スキームと同じ流儀）。渡さなければ main thread で同期計算する。
    */
   createCandidatesWorker?: () => Worker;
+  /** 振り返りバブルの URL（data-url アンカー用）。「振り返りを開く」ボタンから link bubble が伸びる */
+  reviewUrl?: string;
+  /** 振り返りバブルを開く。確定後に自動で開くときもこれを使う */
+  onOpenReview?: () => void;
+  /** 前月の振り返りバブルの URL を作る（前月の勤務表IDを渡す）。引き継ぎ欄から開く */
+  precedingReviewUrl?: (scheduleId: string) => string;
 };
 
 /** 新しい責任者ルールの一意キーを生成する。 */
@@ -181,6 +189,9 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   reservationInfoUrl,
   onOpenRule,
   createCandidatesWorker,
+  reviewUrl,
+  onOpenReview,
+  precedingReviewUrl,
 }) => {
   const store = useAppStore();
   const { scope } = useScheduleHistory();
@@ -221,6 +232,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
 
   // ----- 部署フィルタ / グルーピング状態 -----
   const [groupByDept, setGroupByDept] = useState(false);
+  // 日付の見出しに六曜を添えるか（見え方の切り替え。ドメインのデータは変わらない。既定は切る）
+  const [showRokuyo, setShowRokuyo] = useState(false);
   const [deptFilter, setDeptFilter] = useState<string>(""); // "" = 全部署
 
   // ----- 抽出のためのスタッフ選択状態 -----
@@ -485,6 +498,21 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     [staffList, staffGroup]
   );
 
+  // 名前の横の記号（🔰・責任者・休みの形…）＝スタッフプロファイル（#236）。
+  // 休みの形は上の dayOffStyleOf と同じ引き方（メンバーの上書き → その人の既定値）で読む。
+  // タグは APP スコープの最新値を使う（pinned の焼き付けは古い可能性がある）。
+  const globalStaffById = useGlobalStaffById();
+  const profileOf = useMemo(
+    () =>
+      staffProfileResolver({
+        staffList,
+        staffGroup,
+        leaderRules,
+        globalStaffById,
+      }),
+    [staffList, staffGroup, leaderRules, globalStaffById]
+  );
+
   // 休みのセルに触れたときの説明：その休みがいまの表で何の役目を果たしているか。
   // 置いたときの経緯は保存せず、いまの表（前月の末尾ともひと続き）から読み解く。
   const shiftIdByName = useMemo(
@@ -722,10 +750,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   // 確定版は店舗×月で1つなので、すでにあれば置き換わる（別の勤務表の版でも）。置き換えても
   // 手で書いた部分（タイトル・配慮メモ・重み）は引き継ぐ（ConfirmedSchedule.confirm）。
   // apex には「◯月◯日版」の名前を付ける（既に名前があれば尊重して残す）。
-  // 確定したら、その場で振り返りの欄を開く（振り返りは独立したバブルを持たない）。
-  //
-  // いまの版がすでに確定版なら作り直さず、振り返りを開くだけ（振り返りは確定時点の
-  // スナップショットなので、押し直しで出し直す理由が無い）。
+  // 確定したら振り返りバブルを開く。いまの版がすでに確定版なら作り直さず開くだけ。
   // 世界線のノードから状態を取り出すので resolveObjectsAt を使う（同期の getObjectAt だと
   // メモリから追い出されたぶんが黙って読めず、何も起きないボタンになる）。
   const handleConfirm = async () => {
@@ -838,6 +863,19 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           </select>
         </label>
       )}
+
+      {/* 日付の見出しに六曜を添える（#235）。表の左上の角は、スタッフ列と日付の見出しが
+          交わる所なので、日付の見え方の切り替えもここに置く */}
+      <button
+        type="button"
+        className={`e-icon-btn e-text-btn${showRokuyo ? " is-active" : ""}`}
+        onClick={() => setShowRokuyo((v) => !v)}
+        title="日付の見出しに六曜（大安・仏滅など）を出す"
+        aria-label="日付の見出しに六曜を出す"
+        aria-pressed={showRokuyo}
+      >
+        六曜
+      </button>
     </>
   );
 
@@ -912,7 +950,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
             onImport={() => void handleImportInheritance()}
             busy={importingInheritance}
             wrapSource={(node) =>
-              inherited ? (
+              inherited && precedingReviewUrl ? (
                 <ObjectView
                   type={SCHEDULE_TYPE}
                   id={inherited.source.scheduleId}
@@ -929,6 +967,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           />
         </div>
         )}
+        {/* 右上：確定する＋振り返り */}
+        {confirmButton}
       </div>
 
       {/* 左: 適用中の制約を動的アイコンで描く（稼働日ごと↕ / 人ごと↔ / 全体）
@@ -972,6 +1012,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           reservationInfo={reservationInfo}
           reservationInfoUrl={reservationInfoUrl}
           staffColumnActions={staffColumnActions}
+          dayNoteOf={showRokuyo ? rokuyoNoteOf : undefined}
           wishByStaff={wishByStaff}
           violations={violations}
           constraints={allConstraints}
@@ -999,7 +1040,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           clipboard={clipboard}
           candidateHintOf={candidateHintOf}
           dayOffReasonOf={dayOffReasonOf}
-          dayOffStyleOf={dayOffStyleOf}
+          profileOf={profileOf}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
           onApproveForced={handleApproveForced}
@@ -1085,7 +1126,6 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
                 </span>
               </ObjectView>
           )}
-          {confirmButton}
       </div>
 
       {/* この勤務表が確定版を持っていれば、その振り返り（独立したバブルは持たない。#231）。
@@ -1180,6 +1220,12 @@ const StyledContainer = styled.div<HTMLAttributes<HTMLDivElement> & { ref?: Ref<
         border-color: #3949ab;
         color: #3949ab;
       }
+    }
+
+    /* 文字で示す切り替え（六曜）。アイコンと同じ枠に、小さな文字を入れる */
+    .e-text-btn {
+      font-size: 11px;
+      padding: 2px 4px;
     }
 
     /* 部署フィルタ。目印のアイコン＋部署名の select を1つの枠に見せる */
@@ -1360,6 +1406,33 @@ const StyledContainer = styled.div<HTMLAttributes<HTMLDivElement> & { ref?: Ref<
     box-shadow: 0 -6px 8px -6px rgba(0, 0, 0, 0.15);
   }
 
+  /* 右上：確定する＋振り返り展開口 */
+  .e-confirm-area {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto; /* ヘッダの右端へ寄せる */
+  }
+
+  .e-review-opener {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #2e7d32;
+    border-radius: 6px;
+    background: #e8f5e9;
+    color: #2e7d32;
+    font-size: 0.8em;
+    font-weight: 600;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+
+    &:hover {
+      background: #c8e6c9;
+      border-color: #388e3c;
+    }
+  }
+
   /* 確定する（いま見ている版をこの月の確定版にする） */
   .e-confirm {
     border: 1px solid #2e7d32;
@@ -1375,26 +1448,6 @@ const StyledContainer = styled.div<HTMLAttributes<HTMLDivElement> & { ref?: Ref<
     &:hover {
       background: #e8f5e9;
       border-color: #388e3c;
-    }
-  }
-
-  /* この勤務表が持っている確定版の振り返り（確定した直後は開いて出す） */
-  .e-review {
-    margin-top: 10px;
-    border: 1px solid #ffe082;
-    border-radius: 8px;
-    background: #fffdf5;
-
-    > summary {
-      padding: 6px 10px;
-      font-size: 0.82em;
-      font-weight: 600;
-      color: #8d6e00;
-      cursor: pointer;
-    }
-    .e-review-version {
-      font-weight: normal;
-      color: #b0a060;
     }
   }
 

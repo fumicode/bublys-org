@@ -40,6 +40,7 @@ import {
 import { ScheduleWorld } from "./ScheduleWorld.js";
 import { wishesOfPeriod } from "./shiftWishMonths.js";
 import { useWorkingStaff } from "./workingStaff.js";
+import { staffProfileResolver } from "./staffProfile.js";
 
 type ExtractedScheduleProps = {
   scheduleId?: string;
@@ -107,6 +108,16 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
         (r) => r.leaderStaffIds.length > 0 && r.leaderStaffIds.every((id) => idSet.has(id))
       ),
     [allLeaderRules, idSet]
+  );
+  // 名前の横の記号（スタッフプロファイル）。責任者は抽出に関係するルールだけを出す
+  const profileOf = useMemo(
+    () =>
+      staffProfileResolver({
+        staffList: allStaff,
+        staffGroup,
+        leaderRules: relevantRules,
+      }),
+    [allStaff, staffGroup, relevantRules]
   );
 
   const wishByStaff = useMemo(
@@ -257,6 +268,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
     <StyledContainer>
       {/* 必要最低限：表（日付・人・該当制約の充足行）→ その下に自動コマンド。見出し/説明は出さない */}
       <ScheduleGridView
+        profileOf={profileOf}
         schedule={schedule}
         staffList={subset}
         workShifts={workShifts}

@@ -2,6 +2,7 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MILESTONE_COLOR,
+  MILESTONE_RING_RADIUS_OFFSET,
   milestoneFlagShape,
   type WorldLineGraph,
 } from "@bublys-org/world-line-graph";
@@ -271,6 +272,15 @@ function draw(
     }
 
     if (milestoneNodeIds?.has(id)) {
+      // 節目の金色リング
+      ctx.beginPath();
+      ctx.arc(s.sx, s.sy, r + MILESTONE_RING_RADIUS_OFFSET * Math.max(0.6, s.scale), 0, Math.PI * 2);
+      ctx.strokeStyle = MILESTONE_COLOR;
+      ctx.globalAlpha = 0.7;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
       // 節目の旗（成果木と同じ形。milestoneMark）
       const { pole, pennant } = milestoneFlagShape(s.sx, s.sy, r, Math.max(0.6, s.scale));
       ctx.beginPath();
