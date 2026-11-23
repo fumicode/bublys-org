@@ -41,8 +41,8 @@ export type FormatInput = {
   staffRows: StaffRow[];
   /** セルの勤務割当を返す（feature層が注入） */
   shiftValueOf: (staffId: string, dayKey: string) => ShiftValue;
-  /** その日のシフト希望を返す（feature層が注入） */
-  wishesOf: (staffId: string, dayKey: string) => Record<string, ShiftWishPreference>;
+  /** その日のシフト希望を返す（feature層が注入）。エクスポートでは使わない（インポートのラウンドトリップテスト用） */
+  wishesOf?: (staffId: string, dayKey: string) => Record<string, ShiftWishPreference>;
   /** 確定休みの短縮名（"週" / "祝" / "休" 等）を返す（feature層が注入） */
   dayOffReasonOf: (staffId: string, dayKey: string) => string | undefined;
   /** 勤務帯ID → 勤務帯名（エクスポート時の逆引きに使う。省略時は shiftId をそのまま返す） */
@@ -171,7 +171,8 @@ function buildStaffRow(
 
 /**
  * 1セルの出力値を決める。
- * 優先順: 確定した勤務割当 > 確定休み > 希望 > 空欄
+ * エクスポートは確定した勤務表の出力なので、希望は出さない。
+ * 優先順: 確定した勤務割当 > 確定休み > 空欄
  */
 function cellValueFor(
   staffId: string,
@@ -201,21 +202,6 @@ function cellValueFor(
   const dayOffReason = input.dayOffReasonOf(staffId, dayKey);
   if (dayOffReason) {
     return mapping.symbolForWish(`day-off:${dayOffReason}`) ?? dayOffReason;
-  }
-
-  // 希望を見る
-  const wishes = input.wishesOf(staffId, dayKey);
-  const wantKeys = Object.entries(wishes)
-    .filter(([, pref]) => pref === "want")
-    .map(([key]) => key);
-
-  if (wantKeys.length === 1) {
-    return mapping.symbolForWish(wantKeys[0]) ?? "";
-  }
-  if (wantKeys.length > 1) {
-    // 複数の希望 → 各キーの記号を "or" で結ぶ（見つからなければキーそのまま）
-    const symbols = wantKeys.map((k) => mapping.symbolForWish(k) ?? k);
-    return symbols.join("or");
   }
 
   return "";

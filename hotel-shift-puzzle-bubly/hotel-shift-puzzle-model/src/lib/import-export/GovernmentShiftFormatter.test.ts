@@ -6,14 +6,12 @@ import {
   type StaffRow,
 } from "./GovernmentShiftFormatter.js";
 import { parseGovernmentShift } from "./GovernmentShiftParser.js";
-import { convertImportData } from "./ShiftImportConverter.js";
 import {
   GOVERNMENT_SYMBOL_MAPPING,
 } from "./SymbolMapping.js";
 import { WorkingDay } from "../schedule/WorkingDay.js";
 import { FourWeekPeriod } from "../schedule/SchedulePeriod.js";
 import { DAY_OFF, type ShiftValue } from "../schedule/ShiftAssignment.js";
-import type { ShiftWishPreference } from "../schedule/StaffMonthlyShiftWish.js";
 
 // ========== ヘルパー ==========
 
@@ -28,36 +26,41 @@ function buildSimpleInput(): FormatInput {
     { rowNumber: 17, subNumber: 5, name: "Ｍ　Ｙ", staffId: "staff-2" },
   ];
 
-  const confirmedDaysOff = new Map<string, Map<string, string>>();
-  confirmedDaysOff.set("staff-0", new Map([
-    ["2026-10-25", "週"],
-    ["2026-10-31", "週"],
-    ["2026-11-01", "週"],
-    ["2026-11-03", "祝"],
+  // 確定した割当（休み + 勤務帯）
+  const assignments = new Map<string, Map<string, ShiftValue>>();
+  // staff-0: 週休・祝日のみ
+  assignments.set("staff-0", new Map([
+    ["2026-10-25", DAY_OFF], ["2026-10-31", DAY_OFF],
+    ["2026-11-01", DAY_OFF], ["2026-11-03", DAY_OFF],
   ]));
-  confirmedDaysOff.set("staff-1", new Map([
-    ["2026-10-25", "週"],
-    ["2026-10-31", "週"],
-    ["2026-11-01", "週"],
-    ["2026-11-03", "祝"],
+  // staff-1: 週休・祝日 + 年休 + B勤務
+  assignments.set("staff-1", new Map([
+    ["2026-10-25", DAY_OFF], ["2026-10-31", DAY_OFF],
+    ["2026-11-01", DAY_OFF], ["2026-11-03", DAY_OFF],
+    ["2026-10-28", DAY_OFF], ["2026-10-29", DAY_OFF],
+    ["2026-11-10", "shift-B"],
   ]));
-  confirmedDaysOff.set("staff-2", new Map([
-    ["2026-10-25", "週"],
-    ["2026-10-31", "週"],
-    ["2026-11-01", "週"],
-    ["2026-11-03", "祝"],
+  // staff-2: 週休・祝日 + ②勤務
+  assignments.set("staff-2", new Map([
+    ["2026-10-25", DAY_OFF], ["2026-10-31", DAY_OFF],
+    ["2026-11-01", DAY_OFF], ["2026-11-03", DAY_OFF],
+    ["2026-11-12", "shift-②"],
   ]));
 
-  const wishes = new Map<string, Map<string, Record<string, ShiftWishPreference>>>();
-  wishes.set("staff-1", new Map([
-    ["2026-10-28", { "day-off:年": "want" }],
-    ["2026-10-29", { "day-off:年": "want" }],
-    ["2026-11-10", { "work:B勤務": "want" }],
+  // 休みの理由
+  const dayOffReasons = new Map<string, Map<string, string>>();
+  dayOffReasons.set("staff-0", new Map([
+    ["2026-10-25", "週"], ["2026-10-31", "週"],
+    ["2026-11-01", "週"], ["2026-11-03", "祝"],
   ]));
-  wishes.set("staff-2", new Map([
-    ["2026-10-29", { "work:①勤務": "want", "work:②勤務": "want" }],
-    ["2026-11-05", { "work:①勤務": "want", "work:②勤務": "want" }],
-    ["2026-11-12", { "work:②勤務": "want" }],
+  dayOffReasons.set("staff-1", new Map([
+    ["2026-10-25", "週"], ["2026-10-31", "週"],
+    ["2026-11-01", "週"], ["2026-11-03", "祝"],
+    ["2026-10-28", "年"], ["2026-10-29", "年"],
+  ]));
+  dayOffReasons.set("staff-2", new Map([
+    ["2026-10-25", "週"], ["2026-10-31", "週"],
+    ["2026-11-01", "週"], ["2026-11-03", "祝"],
   ]));
 
   return {
@@ -65,10 +68,15 @@ function buildSimpleInput(): FormatInput {
     period,
     days,
     staffRows,
-    shiftValueOf: () => null,
-    wishesOf: (staffId, dayKey) => wishes.get(staffId)?.get(dayKey) ?? {},
+    shiftValueOf: (staffId, dayKey) =>
+      assignments.get(staffId)?.get(dayKey) ?? null,
     dayOffReasonOf: (staffId, dayKey) =>
-      confirmedDaysOff.get(staffId)?.get(dayKey),
+      dayOffReasons.get(staffId)?.get(dayKey),
+    shiftNameOf: (id: string) => {
+      if (id === "shift-B") return "B勤務";
+      if (id === "shift-②") return "②勤務";
+      return undefined;
+    },
   };
 }
 
@@ -151,19 +159,19 @@ describe("formatGovernmentShift", () => {
       expect(grid[5][13]).toBe("祝");
     });
 
-    it("年休の希望", () => {
-      // Ｓ　Ｅ: 10/28, 10/29 は年休
+    it("年休のセル", () => {
+      // Ｓ　Ｅ: 10/28, 10/29 は年休（確定済み）
       expect(grid[6][7]).toBe("年");
       expect(grid[6][8]).toBe("年");
     });
 
-    it("B勤務の希望", () => {
-      // Ｓ　Ｅ: 11/10 は B勤務
+    it("B勤務のセル", () => {
+      // Ｓ　Ｅ: 11/10 は B勤務（確定済み）
       expect(grid[6][20]).toBe("B");
     });
 
-    it("単一の希望（②）", () => {
-      // Ｍ　Ｙ: 11/12 は ②
+    it("②勤務のセル", () => {
+      // Ｍ　Ｙ: 11/12 は ②（確定済み）
       expect(grid[7][22]).toBe("②");
     });
 
@@ -261,53 +269,66 @@ describe("ラウンドトリップ（パース → フォーマット → 再パ
     return [row0, row1, row2, row3, row4, staff1, staff8, aggregate];
   }
 
-  it("パースしてフォーマットし、再パースしても同じデータが得られる", () => {
+  it("確定した値をフォーマットし、再パースしても同じデータが得られる", () => {
     const originalGrid = buildSampleGrid();
     const mapping = GOVERNMENT_SYMBOL_MAPPING;
 
-    // ステップ1: パース
+    // ステップ1: パースして元データの構造を得る
     const parsed = parseGovernmentShift(originalGrid);
     expect(parsed.staffEntries).toHaveLength(2);
 
-    // ステップ2: コンバート
-    const converted = convertImportData(parsed, mapping, (_name, i) => `staff-${i}`);
+    // ステップ2: 確定した値として FormatInput を組み立てる
+    // 元のExcelのセル値を「確定した割当」として渡す
+    const shiftMap = new Map<string, Map<string, ShiftValue>>();
+    const reasonMap = new Map<string, Map<string, string>>();
+    const shiftNameMap = new Map<string, string>([["shift-B", "B勤務"]]);
 
-    // ステップ3: FormatInput を組み立てる（コンバート結果から）
-    const wishesMap = new Map<string, Map<string, Record<string, ShiftWishPreference>>>();
+    for (const entry of parsed.staffEntries) {
+      const staffId = `staff-${parsed.staffEntries.indexOf(entry)}`;
+      const shifts = new Map<string, ShiftValue>();
+      const reasons = new Map<string, string>();
 
-    for (const sr of converted.staffResults) {
-      const staffId = `staff-${converted.staffResults.indexOf(sr)}`;
-      if (sr.wish) {
-        const dayWishes = new Map<string, Record<string, ShiftWishPreference>>();
-        for (const day of parsed.days) {
-          const w = sr.wish.wishesOn(day);
-          if (Object.keys(w).length > 0) {
-            dayWishes.set(day.key, w);
+      for (const [dayKey, symbol] of entry.cellsByDay) {
+        const interp = mapping.interpret(symbol);
+        if (!interp || interp.kind === "empty") continue;
+        if (interp.kind === "wish" && interp.options.length === 1) {
+          const opt = interp.options[0].optionKey;
+          if (opt.startsWith("day-off:")) {
+            shifts.set(dayKey, DAY_OFF);
+            reasons.set(dayKey, opt.slice("day-off:".length));
+          } else if (opt.startsWith("work:")) {
+            const name = opt.slice("work:".length);
+            const shiftId = `shift-${symbol}`;
+            shiftNameMap.set(shiftId, name);
+            shifts.set(dayKey, shiftId);
           }
         }
-        wishesMap.set(staffId, dayWishes);
       }
+      shiftMap.set(staffId, shifts);
+      reasonMap.set(staffId, reasons);
     }
 
     const formatInput: FormatInput = {
       title: parsed.title,
       period: parsed.period!,
       days: parsed.days,
-      staffRows: converted.staffResults.map((sr, i) => ({
+      staffRows: parsed.staffEntries.map((sr, i) => ({
         rowNumber: sr.rowNumber,
         subNumber: sr.subNumber,
         name: sr.name,
         staffId: `staff-${i}`,
       })),
-      shiftValueOf: () => null,
-      wishesOf: (staffId, dayKey) => wishesMap.get(staffId)?.get(dayKey) ?? {},
-      dayOffReasonOf: () => undefined,
+      shiftValueOf: (staffId, dayKey) =>
+        shiftMap.get(staffId)?.get(dayKey) ?? null,
+      dayOffReasonOf: (staffId, dayKey) =>
+        reasonMap.get(staffId)?.get(dayKey),
+      shiftNameOf: (id: string) => shiftNameMap.get(id),
     };
 
-    // ステップ4: フォーマット
+    // ステップ3: フォーマット
     const exportedGrid = formatGovernmentShift(formatInput, mapping);
 
-    // ステップ5: 再パース
+    // ステップ4: 再パース
     const reparsed = parseGovernmentShift(exportedGrid);
 
     // 検証: 期間

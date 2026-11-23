@@ -8,7 +8,7 @@ import {
   type FormatInput,
   type StaffRow,
 } from "@bublys-org/hotel-shift-puzzle-model";
-import type { ShiftWishPreference } from "@bublys-org/hotel-shift-puzzle-model";
+
 
 function buildSampleExcelGrid(): string[][] {
   const row0 = [
@@ -86,47 +86,61 @@ describe("Excel インポート統合テスト", () => {
   });
 });
 
-describe("Excel ラウンドトリップ（import → export → reimport）", () => {
-  it("インポート → エクスポート → 再インポートでデータが保存される", () => {
+describe("Excel ラウンドトリップ（確定値 export → reimport）", () => {
+  it("確定した値をエクスポートし、再インポートで同じ値が希望として読み込まれる", () => {
     const grid = buildSampleExcelGrid();
     const buffer1 = writeGridToExcel(grid);
 
-    // Step 1: インポート
-    const { parsed, converted } = importShiftFromExcel(
+    // Step 1: インポートしてスタッフ構造を得る
+    const { parsed } = importShiftFromExcel(
       buffer1,
       (_name, i) => `staff-${i}`,
     );
 
-    // Step 2: FormatInput を組み立てる
-    const wishesMap = new Map<string, Map<string, Record<string, ShiftWishPreference>>>();
+    // Step 2: 確定した値として FormatInput を組み立てる
+    // 元のExcelと同じセル値を「確定した割当」として渡す
+    const shiftMap = new Map<string, Map<string, string>>();
+    const reasonMap = new Map<string, Map<string, string>>();
+    const shiftNames = new Map<string, string>([["shift-B", "B勤務"]]);
 
-    for (const sr of converted.staffResults) {
-      const staffId = `staff-${converted.staffResults.indexOf(sr)}`;
-      if (sr.wish) {
-        const dayWishes = new Map<string, Record<string, ShiftWishPreference>>();
-        for (const day of parsed.days) {
-          const w = sr.wish.wishesOn(day);
-          if (Object.keys(w).length > 0) {
-            dayWishes.set(day.key, w);
+    for (const entry of parsed.staffEntries) {
+      const staffId = `staff-${parsed.staffEntries.indexOf(entry)}`;
+      const shifts = new Map<string, string>();
+      const reasons = new Map<string, string>();
+      for (const [dayKey, symbol] of entry.cellsByDay) {
+        const interp = GOVERNMENT_SYMBOL_MAPPING.interpret(symbol);
+        if (!interp || interp.kind === "empty") continue;
+        if (interp.kind === "wish" && interp.options.length === 1) {
+          const opt = interp.options[0].optionKey;
+          if (opt.startsWith("day-off:")) {
+            shifts.set(dayKey, "day-off");
+            reasons.set(dayKey, opt.slice("day-off:".length));
+          } else if (opt.startsWith("work:")) {
+            const shiftId = `shift-${symbol}`;
+            shiftNames.set(shiftId, opt.slice("work:".length));
+            shifts.set(dayKey, shiftId);
           }
         }
-        wishesMap.set(staffId, dayWishes);
       }
+      shiftMap.set(staffId, shifts);
+      reasonMap.set(staffId, reasons);
     }
 
     const formatInput: FormatInput = {
       title: parsed.title,
       period: parsed.period!,
       days: parsed.days,
-      staffRows: converted.staffResults.map((sr, i): StaffRow => ({
+      staffRows: parsed.staffEntries.map((sr, i): StaffRow => ({
         rowNumber: sr.rowNumber,
         subNumber: sr.subNumber,
         name: sr.name,
         staffId: `staff-${i}`,
       })),
-      shiftValueOf: () => null,
-      wishesOf: (staffId, dayKey) => wishesMap.get(staffId)?.get(dayKey) ?? {},
-      dayOffReasonOf: () => undefined,
+      shiftValueOf: (staffId, dayKey) =>
+        shiftMap.get(staffId)?.get(dayKey) ?? null,
+      dayOffReasonOf: (staffId, dayKey) =>
+        reasonMap.get(staffId)?.get(dayKey),
+      shiftNameOf: (id: string) => shiftNames.get(id),
     };
 
     // Step 3: エクスポート
@@ -145,13 +159,13 @@ describe("Excel ラウンドトリップ（import → export → reimport）", (
     expect(reconverted.staffResults[0].name).toBe("W　Ｙ");
     expect(reconverted.staffResults[1].name).toBe("Ｓ　Ｅ");
 
-    // 週休が希望として保存されている
+    // 週休が希望として再インポートされる
     const day1025 = WorkingDay.of(2026, 10, 25);
     expect(
       reconverted.staffResults[0].wish!.preferenceFor(day1025, "day-off:週"),
     ).toBe("want");
 
-    // 年休の希望が保存されている
+    // 年休が希望として再インポートされる
     const day1028 = WorkingDay.of(2026, 10, 28);
     expect(
       reconverted.staffResults[1].wish!.preferenceFor(day1028, "day-off:年"),

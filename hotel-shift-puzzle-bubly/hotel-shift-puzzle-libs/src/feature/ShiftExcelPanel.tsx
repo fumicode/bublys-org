@@ -212,8 +212,6 @@ const ShiftExcelPanelInner: FC<{
         staffId: s.id,
       }));
 
-      const confirmedDaysOff = new Map<string, Map<string, string>>();
-
       const formatInput: FormatInput = {
         title: `${schedule.state.period.label}　シフト`,
         period: schedule.state.period,
@@ -231,8 +229,11 @@ const ShiftExcelPanelInner: FC<{
           const day = days.find((d: { key: string }) => d.key === dayKey);
           return day ? w.wishesOn(day) : {};
         },
-        dayOffReasonOf: (staffId, dayKey) =>
-          confirmedDaysOff.get(staffId)?.get(dayKey),
+        dayOffReasonOf: (staffId: string, dayKey: string) => {
+          const day = dayMap.get(dayKey);
+          if (!day) return undefined;
+          return schedule.getAssignment(staffId, day)?.dayOffReason;
+        },
         shiftNameOf: (shiftId: string) =>
           workShiftSet?.shifts.find((s) => s.id === shiftId)?.name,
       };
