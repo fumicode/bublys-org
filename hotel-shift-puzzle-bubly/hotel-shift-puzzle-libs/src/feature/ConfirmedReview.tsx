@@ -8,6 +8,7 @@ import { useObjectShell } from "../objects/repository.js";
 import { CONFIRMED_SCHEDULE_TYPE } from "../objects/hotelObjects.js";
 import { confirmedAtOf } from "./precedingMonth.js";
 import { useWorkingStaff } from "./workingStaff.js";
+import { useStore } from "./useStore.js";
 
 type ConfirmedReviewProps = {
   /** 振り返る確定版 */
@@ -29,6 +30,7 @@ type ConfirmedReviewProps = {
 export const ConfirmedReview: FC<ConfirmedReviewProps> = ({ report, editable = false }) => {
   const store = useAppStore();
   const { staffList } = useWorkingStaff(report.scheduleId);
+  const storeName = useStore(report.storeId)?.name ?? report.storeId;
   // 確定版は世界に属さない（external）ので、どの世界の中からでもシェル経由で書ける
   const { update } = useObjectShell<ConfirmedSchedule>(CONFIRMED_SCHEDULE_TYPE, report.id);
 
@@ -39,6 +41,7 @@ export const ConfirmedReview: FC<ConfirmedReviewProps> = ({ report, editable = f
     <ReviewView
       report={report}
       nameOf={nameOf}
+      storeName={storeName}
       confirmedAt={confirmedAtOf(store, report)}
       {...(editable
         ? {

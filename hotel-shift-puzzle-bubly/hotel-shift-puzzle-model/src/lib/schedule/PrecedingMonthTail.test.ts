@@ -5,6 +5,7 @@ import {
   precedingTailLengthFor,
   PRECEDING_TAIL_MIN_DAYS,
 } from './PrecedingMonthTail.js';
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
   /** 前月＝2026年5月（31日まで）。今月＝6月 */
@@ -12,7 +13,7 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
   const SHIFT_NAMES: Record<string, string> = { e1: '早番', l1: '遅番' };
 
   const maySchedule = () =>
-    MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', year: 2026, month: 5 })
+    MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', period: CalendarMonthPeriod.of(2026, 5) })
       .assignShift('A', may(29), 'e1')
       .assignShift('A', may(30), 'e1')
       .assignShift('A', may(31), 'l1')
@@ -24,7 +25,7 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
   const capture = (length = 7) =>
     PrecedingMonthTail.capture({
       source: { scheduleId: 'may', worldLineNodeId: 'node-1' },
-      contributions: [],
+      stars: [],
       confirmedAt: 1000,
       schedule: maySchedule(),
       shiftNameOf: (id) => SHIFT_NAMES[id],
@@ -54,7 +55,7 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
   test('定義から消えた勤務帯でも、出勤だった事実は落とさない（IDを名前として残す）', () => {
     const tail = PrecedingMonthTail.capture({
       source: { scheduleId: 'r', worldLineNodeId: '' },
-      contributions: [],
+      stars: [],
       schedule: maySchedule(),
       shiftNameOf: () => undefined,
       length: 1,
@@ -65,18 +66,18 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
   });
 
   test('直前の月末で終わっていれば、その月につながる（1月の前月は前年12月）', () => {
-    expect(capture().directlyPrecedes(2026, 6)).toBe(true);
-    expect(capture().directlyPrecedes(2026, 7)).toBe(false);
+    expect(capture().directlyPrecedes(CalendarMonthPeriod.of(2026, 6))).toBe(true);
+    expect(capture().directlyPrecedes(CalendarMonthPeriod.of(2026, 7))).toBe(false);
 
-    const dec = MonthlyStaffSchedule.create({ id: 'dec', storeId: 's', year: 2025, month: 12 });
+    const dec = MonthlyStaffSchedule.create({ id: 'dec', storeId: 's', period: CalendarMonthPeriod.of(2025, 12) });
     const decTail = PrecedingMonthTail.capture({
       source: { scheduleId: 'r', worldLineNodeId: '' },
-      contributions: [],
+      stars: [],
       schedule: dec,
       shiftNameOf: () => undefined,
       length: 7,
     });
-    expect(decTail.directlyPrecedes(2026, 1)).toBe(true);
+    expect(decTail.directlyPrecedes(CalendarMonthPeriod.of(2026, 1))).toBe(true);
   });
 
   test('★も一緒に写し取る。写した後に元を変えても、写しは変わらない', () => {
@@ -86,14 +87,14 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
       schedule: maySchedule(),
       shiftNameOf: (id) => SHIFT_NAMES[id],
       length: 7,
-      contributions: scores,
+      stars: scores,
     });
     scores[0].score = 99;
 
-    expect(tail.contributionOf('A')).toBe(5);
-    expect(tail.contributionOf('新人')).toBe(0);
+    expect(tail.starsOf('A')).toBe(5);
+    expect(tail.starsOf('新人')).toBe(0);
     const back = PrecedingMonthTail.fromPlain(JSON.parse(JSON.stringify(tail.toPlain())));
-    expect(back.contributions).toEqual([
+    expect(back.stars).toEqual([
       { staffId: 'A', compromiseCount: 2, busyDayCount: 1, score: 5 },
     ]);
   });
@@ -108,8 +109,8 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
 
     expect(tail.source).toEqual({ scheduleId: 'may', worldLineNodeId: 'node-1' });
     // ★を写す前の形は「0点ばかり」と区別する
-    expect(tail.contributions).toBeUndefined();
-    expect(tail.contributionOf('A')).toBe(0);
+    expect(tail.stars).toBeUndefined();
+    expect(tail.starsOf('A')).toBe(0);
     expect(tail.toPlain()).not.toHaveProperty('sourceReportId');
   });
 
@@ -119,10 +120,10 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
       schedule: maySchedule(),
       shiftNameOf: (id) => SHIFT_NAMES[id],
       length: 7,
-      contributions: [{ staffId: 'A', compromiseCount: 1, busyDayCount: 0, score: 2 }],
+      stars: [{ staffId: 'A', compromiseCount: 1, busyDayCount: 0, score: 2 }],
     }).toPlain();
     const restored = PrecedingMonthTail.fromPlain({ ...rest, contributionScores: stars });
-    expect(restored.contributionOf('A')).toBe(2);
+    expect(restored.starsOf('A')).toBe(2);
     expect(restored.toPlain()).not.toHaveProperty('contributionScores');
   });
 
@@ -142,7 +143,7 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
 
   describe('勤務表へのつなぎ', () => {
     const june = () =>
-      MonthlyStaffSchedule.create({ id: 'june', storeId: 'store-1', year: 2026, month: 6 });
+      MonthlyStaffSchedule.create({ id: 'june', storeId: 'store-1', period: CalendarMonthPeriod.of(2026, 6) });
 
     test('つないだ末尾は勤務表と一緒に保存され、外せる', () => {
       const linked = june().withPrecedingTail(capture());
@@ -158,14 +159,14 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
     });
 
     test('直前の月末で終わっていない末尾はつなげない', () => {
-      const july = MonthlyStaffSchedule.create({ id: 'jul', storeId: 's', year: 2026, month: 7 });
+      const july = MonthlyStaffSchedule.create({ id: 'jul', storeId: 's', period: CalendarMonthPeriod.of(2026, 7) });
       expect(() => july.withPrecedingTail(capture())).toThrow();
     });
 
-    test('前の月（1月なら前年12月）', () => {
-      expect(june().previousYearMonth()).toEqual({ year: 2026, month: 5 });
-      const jan = MonthlyStaffSchedule.create({ id: 'j', storeId: 's', year: 2026, month: 1 });
-      expect(jan.previousYearMonth()).toEqual({ year: 2025, month: 12 });
+    test('前の期（1月なら前年12月）', () => {
+      expect(june().period.previous().equals(CalendarMonthPeriod.of(2026, 5))).toBe(true);
+      const jan = MonthlyStaffSchedule.create({ id: 'j', storeId: 's', period: CalendarMonthPeriod.of(2026, 1) });
+      expect(jan.period.previous().equals(CalendarMonthPeriod.of(2025, 12))).toBe(true);
     });
   });
 });

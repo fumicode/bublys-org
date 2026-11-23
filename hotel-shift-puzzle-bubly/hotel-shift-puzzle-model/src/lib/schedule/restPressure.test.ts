@@ -3,10 +3,11 @@ import { WorkingDay } from './WorkingDay.js';
 import { DayOffStyle } from '../staff/DayOffStyle.js';
 import { compareRestPressure, restPressureOf } from './restPressure.js';
 import type { DecodedWish } from './autoShiftStep.js';
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 describe('restPressureOf（その日を出勤にしたら、休みの形がどれだけ崩れるか）', () => {
   const day = (d: number) => WorkingDay.of(2026, 6, d);
-  const empty = () => MonthlyStaffSchedule.create({ id: 's', storeId: 'x', year: 2026, month: 6 });
+  const empty = () => MonthlyStaffSchedule.create({ id: 's', storeId: 'x', period: CalendarMonthPeriod.of(2026, 6) });
   const ctx = (opts: { style?: DayOffStyle; prefs?: Record<number, DecodedWish>; minDayOff?: number } = {}) => ({
     dayOffStyleOf: () => opts.style ?? DayOffStyle.spread(),
     maxConsecutiveWorkdays: 5,

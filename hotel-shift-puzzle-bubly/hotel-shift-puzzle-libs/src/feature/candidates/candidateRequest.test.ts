@@ -7,6 +7,7 @@ import {
   WorkingDay,
   WorkingStaffGroup,
   WorkingStaffMember,
+  CalendarMonthPeriod,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { computeCandidatesFor, type CandidateRequest } from "./candidateRequest.js";
 
@@ -36,8 +37,7 @@ describe("computeCandidatesFor", () => {
   const baseSchedule = MonthlyStaffSchedule.create({
     id: "sched-1",
     storeId: "store-1",
-    year: 2026,
-    month: 6,
+    period: CalendarMonthPeriod.of(2026, 6),
   });
 
   const requestFor = (

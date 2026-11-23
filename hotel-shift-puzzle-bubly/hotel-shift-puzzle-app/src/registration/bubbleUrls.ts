@@ -13,9 +13,16 @@
  */
 import { registerObjectUrl } from "@bublys-org/bubbles-ui";
 import {
+  CalendarMonthPeriod,
+  SchedulePeriod,
+} from "@bublys-org/hotel-shift-puzzle-model";
+import {
   STAFF_TYPE,
   SCHEDULE_TYPE,
 } from "@bublys-org/hotel-shift-puzzle-libs";
+
+/** 店舗一覧バブル（名前・形態・区切り方・起算日） */
+export const storeListUrl = (): string => `hotel-shift-puzzle/stores`;
 
 /** スタッフ詳細バブル */
 export const staffUrl = (staffId: string): string =>
@@ -29,19 +36,33 @@ export const staffUrl = (staffId: string): string =>
 export const scheduleStaffDetailUrl = (scheduleId: string, staffId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/staffs/${staffId}`;
 
-/** シフト希望の入口。希望を集める月（＝勤務表がある月）が並ぶ月一覧 */
+/** シフト希望の入口。希望を集める期（＝勤務表がある期）が並ぶ一覧 */
 export const shiftWishListUrl = (): string => `hotel-shift-puzzle/shift-wishes`;
 
-/** その月のシフト希望一覧バブル（スタッフ全員 × 回収状況） */
-export const shiftWishMonthUrl = (year: number, month: number): string =>
-  `hotel-shift-puzzle/shift-wishes/${year}/${month}`;
+/**
+ * その期のシフト希望一覧バブル（スタッフ全員 × 回収状況）。期はキーで載せる
+ * （"2026-06" / "four-week:2026-06-07"）。
+ */
+export const shiftWishPeriodUrl = (period: SchedulePeriod): string =>
+  `hotel-shift-puzzle/shift-wishes/${period.key}`;
 
-/** スタッフ月別シフト希望の入力表バブル */
-export const staffShiftWishUrl = (
-  staffId: string,
-  year: number,
-  month: number
-): string => `hotel-shift-puzzle/staffs/${staffId}/shift-wish/${year}/${month}`;
+/** スタッフの期ごとのシフト希望の入力表バブル */
+export const staffShiftWishUrl = (staffId: string, period: SchedulePeriod): string =>
+  `hotel-shift-puzzle/staffs/${staffId}/shift-wish/${period.key}`;
+
+/**
+ * 希望のバブルの URL のパラメータから期を読む。期のキー（:periodKey）と、期を入れる前の
+ * 年月（:year/:month。保存済みのバブル配置に残っている）のどちらでも読む。読めなければ undefined。
+ */
+export const periodOfWishParams = (params: Record<string, string>): SchedulePeriod | undefined => {
+  if (params.periodKey !== undefined) return SchedulePeriod.fromKey(params.periodKey);
+  const year = Number(params.year);
+  const month = Number(params.month);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    return undefined;
+  }
+  return CalendarMonthPeriod.of(year, month);
+};
 
 /** 振り返りバブル（確定版の振り返りを独立したバブルで開く） */
 export const scheduleReviewUrl = (scheduleId: string): string =>

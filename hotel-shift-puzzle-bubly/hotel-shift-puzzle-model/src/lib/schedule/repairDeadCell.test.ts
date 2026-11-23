@@ -8,6 +8,7 @@ import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 import { AllowedShiftConstraint, ALLOWED_SHIFT_CONSTRAINT } from "./AllowedShiftConstraint.js";
 import { WorkingStaffGroup } from "../staff/WorkingStaffGroup.js";
 import { WorkingStaffMember } from "../staff/WorkingStaffMember.js";
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 const early = WorkShift.of("early", "早番", { hour: 7 });
 const workShifts = [early];
@@ -23,8 +24,7 @@ function deadBoard() {
   let schedule = MonthlyStaffSchedule.create({
     id: "sched-1",
     storeId: "store-1",
-    year: 2026,
-    month: 6,
+    period: CalendarMonthPeriod.of(2026, 6),
   });
   for (let d = 1; d <= 5; d++) schedule = schedule.setCell("s1", day(d), work);
   schedule = schedule.setCell("s2", day(6), off);
@@ -92,8 +92,7 @@ describe("findRepairsForDeadCell", () => {
     const schedule = MonthlyStaffSchedule.create({
       id: "sched-1",
       storeId: "store-1",
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
     const diagnosis = findRepairsForDeadCell(input(schedule), dead);
     expect(diagnosis.repairs).toEqual([]);

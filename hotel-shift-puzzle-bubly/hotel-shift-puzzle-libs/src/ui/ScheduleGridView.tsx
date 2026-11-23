@@ -18,7 +18,7 @@ import {
   SHIFT_LEADER_CONSTRAINT,
   previewCellValues,
   type CellValuePreview,
-  type ContributionEntry,
+  type StarEntry,
   type StaffProfile,
 } from "../domain/index.js";
 import {
@@ -31,8 +31,8 @@ import {
   DEMAND_CELL_KEY_PREFIX,
   requiredCellKey,
 } from "./schedule-grid/constants.js";
-import { StyledWrap } from "./schedule-grid/styles.js";
 import { DAY_NOTE_COLOR, type DayNote } from "./schedule-grid/cellSymbols.js";
+import { StyledWrap } from "./schedule-grid/styles.js";
 import { wishEntriesFor } from "./schedule-grid/wishSummary.js";
 import { buildSummaryRows } from "./schedule-grid/summaryModel.js";
 import { StaffScheduleRow } from "./schedule-grid/StaffScheduleRow.js";
@@ -93,11 +93,6 @@ type ScheduleGridViewProps = {
    * 位置で示す。表の外の見出し行には置かない。中身は app/feature 層が決める。
    */
   staffColumnActions?: ReactNode;
-  /**
-   * 日付に添える注記（六曜など）。渡すと日付の見出しの下に小さく出す。何を添えるかは
-   * feature 層が決める（表は中身を知らない）。省略すると何も添えない
-   */
-  dayNoteOf?: (day: WorkingDay) => DayNote | undefined;
   /** スタッフID → その月のシフト希望。各セル隅にマーカーで表示する */
   wishByStaff?: Map<string, StaffMonthlyShiftWish>;
   /** 制約違反の一覧。該当セルに赤線を引き、クリックで違反バブルを開く */
@@ -113,8 +108,13 @@ type ScheduleGridViewProps = {
   leaderRules?: ShiftLeaderRule[];
   /** true なら footer を責任者ルールの ◯/✕ 行だけにする（必要人数・休み行を出さない）。抽出ビュー用 */
   leaderRulesOnlyFooter?: boolean;
+  /**
+   * 日付に添える注記（六曜など）。渡すと日付の見出しの下に小さく出す。何を添えるかは
+   * feature 層が決める（表は中身を知らない）。省略すると何も添えない
+   */
+  dayNoteOf?: (day: WorkingDay) => DayNote | undefined;
   /** 前月の確定版から引き継いだ★。渡すと、スコアのある人の名前の横に出す（＝休みの優先度） */
-  inheritedScores?: readonly ContributionEntry[];
+  inheritedScores?: readonly StarEntry[];
   /**
    * スタッフ名から開くバブルの URL。省略時はスタッフの正規 URL（どの勤務表でもないスタッフ詳細）。
    * 勤務表から開くときは、その勤務表の文脈を持った URL を渡す。
@@ -235,7 +235,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   reservationInfo,
   reservationInfoUrl,
   staffColumnActions,
-  dayNoteOf,
   wishByStaff,
   violations = [],
   groupByDepartment = false,
@@ -261,6 +260,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   clipboard,
   constraints,
   candidateHintOf,
+  dayNoteOf,
   dayOffReasonOf,
   profileOf,
   forcedCellOf,
@@ -680,7 +680,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         {/* ヘッダ行: 左上の角 + 日付ヘッダ + 休合計 + 早番日数 */}
         <div className="e-corner">
           <span className="e-corner-title">
-            {schedule.year}年{schedule.month}月
+            {schedule.period.label}
           </span>
           {/* スタッフ列に効く操作（部署別・部署フィルタ・可能勤務帯）。スタッフ列の真上＝
               このコーナーセルに入れて、何に効く操作なのかを位置で示す。 */}
@@ -688,7 +688,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             <span className="e-corner-actions">{staffColumnActions}</span>
           )}
         </div>
-        <PrecedingHeadCells days={precedingDays} />
+        <PrecedingHeadCells days={precedingDays} previous={schedule.period.words.previous} />
         {days.map((day) => {
           const wd = day.weekday; // 0=日 6=土
           const warns = dayWarnings.get(day.key);

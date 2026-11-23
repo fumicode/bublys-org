@@ -41,17 +41,17 @@ export const ConfirmedReviewPanel: FC<ConfirmedReviewPanelProps> = ({
             type={SCHEDULE_TYPE}
             id={scheduleId}
             url={scheduleUrl}
-            label={`${confirmed.year}年${confirmed.month}月の勤務表`}
+            label={`${confirmed.period.label}の勤務表`}
             openingPosition="bubble-side-right"
           >
             <div className="p-header">
-              {confirmed.year}年{confirmed.month}月の勤務表
+              {confirmed.period.label}の勤務表
             </div>
           </ObjectView>
         )}
         {!scheduleUrl && (
           <div className="p-header is-plain">
-            {confirmed.year}年{confirmed.month}月の振り返り
+            {confirmed.period.label}の振り返り
           </div>
         )}
         <ConfirmedReview report={confirmed} editable />

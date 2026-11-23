@@ -1,12 +1,12 @@
 import { ConfirmedSchedule } from './ConfirmedSchedule.js';
+import { CalendarMonthPeriod } from './SchedulePeriod.js';
 
 describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
   const create = () =>
     ConfirmedSchedule.create({
       scheduleId: 'schedule-A',
       worldLineNodeId: 'node-1',
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
       storeId: 'store-1',
       compromises: [
         {
@@ -19,7 +19,7 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
       busyDayContributions: [
         { dayKey: '2026-06-10', requiredCount: 5, workedStaffIds: ['staff-A', 'staff-B'] },
       ],
-      contributions: [
+      stars: [
         { staffId: 'staff-A', compromiseCount: 1, busyDayCount: 1, score: 3 },
         { staffId: 'staff-B', compromiseCount: 0, busyDayCount: 1, score: 1 },
       ],
@@ -27,7 +27,7 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
 
   test('id は店舗×月で一意（どの勤務表・どの版かには依らない）', () => {
     expect(create().id).toBe('store-1:2026-06');
-    expect(ConfirmedSchedule.idFor('store-2', 2026, 12)).toBe('store-2:2026-12');
+    expect(ConfirmedSchedule.idFor('store-2', CalendarMonthPeriod.of(2026, 12))).toBe('store-2:2026-12');
     expect(create().version).toEqual({ scheduleId: 'schedule-A', worldLineNodeId: 'node-1' });
   });
 
@@ -35,32 +35,32 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
     const r = create();
     expect(r.compromises).toHaveLength(1);
     expect(r.busyDayContributions).toHaveLength(1);
-    expect(r.contributions).toHaveLength(2);
+    expect(r.stars).toHaveLength(2);
   });
 
-  test('contributionOf はそのスタッフの貢献度を返す（行が無ければ 0）', () => {
+  test('starsOf はそのスタッフの★を返す（行が無ければ 0）', () => {
     const r = create();
-    expect(r.contributionOf('staff-A')).toBe(3);
-    expect(r.contributionOf('staff-B')).toBe(1);
-    expect(r.contributionOf('staff-Z')).toBe(0);
+    expect(r.starsOf('staff-A')).toBe(3);
+    expect(r.starsOf('staff-B')).toBe(1);
+    expect(r.starsOf('staff-Z')).toBe(0);
   });
 
   test('★を「貢献度スコア」と呼んでいた頃の保存形（contributionScores）も読める', () => {
     const { stars, ...rest } = create().toPlain();
     const restored = ConfirmedSchedule.fromPlain({ ...rest, contributionScores: stars });
-    expect(restored.contributionOf('staff-A')).toBe(3);
+    expect(restored.starsOf('staff-A')).toBe(3);
     expect(restored.toPlain()).not.toHaveProperty('contributionScores');
   });
 
   describe('precedingIdFor（引き継ぐのは同じ店舗の前月の確定版）', () => {
     test('同じ店舗の、ちょうど1か月前', () => {
-      expect(ConfirmedSchedule.precedingIdFor({ storeId: 'store-1', year: 2026, month: 7 })).toBe(
+      expect(ConfirmedSchedule.precedingIdFor({ storeId: 'store-1', period: CalendarMonthPeriod.of(2026, 7) })).toBe(
         create().id
       );
     });
 
     test('1月の前月は前年12月', () => {
-      expect(ConfirmedSchedule.precedingIdFor({ storeId: 'store-1', year: 2027, month: 1 })).toBe(
+      expect(ConfirmedSchedule.precedingIdFor({ storeId: 'store-1', period: CalendarMonthPeriod.of(2027, 1) })).toBe(
         'store-1:2026-12'
       );
     });
@@ -70,12 +70,11 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
     const params = (scheduleId: string, worldLineNodeId: string) => ({
       scheduleId,
       worldLineNodeId,
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
       storeId: 'store-1',
       compromises: [],
       busyDayContributions: [],
-      contributions: [{ staffId: 'staff-A', compromiseCount: 1, busyDayCount: 2, score: 4 }],
+      stars: [{ staffId: 'staff-A', compromiseCount: 1, busyDayCount: 2, score: 4 }],
       confirmedAt: 2000,
     });
 
@@ -102,11 +101,11 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
       expect(next.noteFor('staff-A')).toBe('来月は休みを優先');
       // スコアは引き継いだ重みで出し直す（譲歩1×3 + 繁忙日2×1）
       expect(next.compromiseWeight).toBe(3);
-      expect(next.contributionOf('staff-A')).toBe(5);
+      expect(next.starsOf('staff-A')).toBe(5);
     });
 
     test('別の店舗・月の確定版は置き換えられない', () => {
-      const other = ConfirmedSchedule.confirm({ ...params('schedule-A', 'node-1'), month: 7 });
+      const other = ConfirmedSchedule.confirm({ ...params('schedule-A', 'node-1'), period: CalendarMonthPeriod.of(2026, 7) });
       expect(() => ConfirmedSchedule.confirm(params('schedule-A', 'node-1'), other)).toThrow();
     });
   });
@@ -163,7 +162,7 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
 
     expect(reweighted.compromiseWeight).toBe(1);
     expect(reweighted.busyDayWeight).toBe(3);
-    expect(reweighted.contributions).toEqual([
+    expect(reweighted.stars).toEqual([
       { staffId: 'staff-A', compromiseCount: 1, busyDayCount: 1, score: 4 }, // 1*1+1*3
       { staffId: 'staff-B', compromiseCount: 0, busyDayCount: 1, score: 3 }, // 0*1+1*3
     ]);
@@ -179,7 +178,7 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
     const base = create();
     const reweighted = base.reweight(0, 5);
 
-    expect(reweighted.contributions).toEqual([
+    expect(reweighted.stars).toEqual([
       { staffId: 'staff-A', compromiseCount: 1, busyDayCount: 1, score: 5 },
       { staffId: 'staff-B', compromiseCount: 0, busyDayCount: 1, score: 5 },
     ]);
@@ -189,7 +188,7 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
     const reweighted = create().reweight(-1, -2);
     expect(reweighted.compromiseWeight).toBe(0);
     expect(reweighted.busyDayWeight).toBe(0);
-    expect(reweighted.contributions.every((s) => s.score === 0)).toBe(true);
+    expect(reweighted.stars.every((s) => s.score === 0)).toBe(true);
   });
 
   test('重みも toPlain / fromPlain でラウンドトリップできる', () => {
@@ -213,8 +212,8 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
 
   test('確定時刻を持てる。toPlain / fromPlain で残り、古い記録には無い', () => {
     const report = ConfirmedSchedule.create({
-      scheduleId: 's', worldLineNodeId: 'n', year: 2026, month: 6, storeId: 'store-1',
-      compromises: [], busyDayContributions: [], contributions: [],
+      scheduleId: 's', worldLineNodeId: 'n', period: CalendarMonthPeriod.of(2026, 6), storeId: 'store-1',
+      compromises: [], busyDayContributions: [], stars: [],
       confirmedAt: 1700000000000,
     });
     expect(ConfirmedSchedule.fromPlain(report.toPlain()).confirmedAt).toBe(1700000000000);

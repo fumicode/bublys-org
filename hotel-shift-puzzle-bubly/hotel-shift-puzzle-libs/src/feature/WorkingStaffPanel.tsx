@@ -116,7 +116,7 @@ const WorkingStaffPanelBody: FC<Props> = ({ scheduleId }) => {
     <StyledContainer>
       <div className="e-header">
         <h3>
-          {schedule.year}年{schedule.month}月勤務スタッフ({staffList.length}名)
+          {schedule.period.label}勤務スタッフ({staffList.length}名)
         </h3>
       </div>
       <WorkingStaffListView

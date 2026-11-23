@@ -17,6 +17,7 @@ import {
   StaffMonthlyShiftWish,
   ConstraintSet,
   ConfirmedSchedule,
+  type SchedulePeriod,
   fulfillWishesStep,
   makeSatisfyLeaderRulesStep,
   makeResolveAmbiguousLeaderSlotsStep,
@@ -61,8 +62,10 @@ import {
   nextForcedCellAfter,
 } from "./candidates/index.js";
 import { scheduleConstraintsOf, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
-import { prioritizeStaffByContribution } from "./contributionPriority.js";
+import { prioritizeStaffByStars } from "./starPriority.js";
 import { buildReview } from "./buildReview.js";
+import { useStore } from "./useStore.js";
+import { wishesOfPeriod } from "./shiftWishMonths.js";
 import { rokuyoNoteOf } from "./rokuyoNote.js";
 import {
   captureInheritance,
@@ -119,7 +122,7 @@ type ScheduleGridProps = {
    * この勤務表の月のシフト希望一覧（回収状況）バブルの URL を作る（年月を渡す）。
    * 年月は勤務表が持っているので、ここでビルダーとして受けて呼ぶ。
    */
-  shiftWishesUrl?: (year: number, month: number) => string;
+  shiftWishesUrl?: (period: SchedulePeriod) => string;
   /**
    * 稼働日詳細バブルの URL を作る（稼働日キーを渡す）。URL スキームは app 層の関心事なので
    * バブルルート側から注入してもらう。グリッドはこれを ObjectView に渡すだけ。
@@ -223,6 +226,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   );
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
+  // storeId は人に見せない。見せるのは店舗の名前（記録が無ければ ID のまま）
+  const storeName = useStore(schedule?.storeId)?.name ?? "";
 
   // ----- 部署フィルタ / グルーピング状態 -----
   const [groupByDept, setGroupByDept] = useState(false);
@@ -287,8 +292,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   const inherited = schedule?.precedingTail;
   // 作った後に前月の確定版が置き換わっても、あとから確定しても、勝手には取り込まない。知らせるだけ
   const pendingInheritance = pendingInheritanceOf(precedingConfirmed, inherited);
-  // 引き継いだ貢献度は、スイッチがオンのときだけ自動シフトの優先度（と★の表示）に使う
-  const priorityStars = constraints?.useContributionPriority
+  // 引き継いだ★は、スイッチがオンのときだけ自動シフトの優先度（と★の表示）に使う
+  const priorityStars = constraints?.useStarPriority
     ? inheritedScoresOf(inherited, precedingConfirmed)
     : undefined;
   const [importingInheritance, setImportingInheritance] = useState(false);
@@ -347,17 +352,13 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   }, [staffList]);
 
   // この勤務表と同じ年月のシフト希望を staffId 別に引けるようにする
-  const wishByStaff = useMemo(() => {
-    const map = new Map<string, StaffMonthlyShiftWish>();
-    if (schedule) {
-      for (const w of allWishes) {
-        if (w.year === schedule.year && w.month === schedule.month) {
-          map.set(w.staffId, w);
-        }
-      }
-    }
-    return map;
-  }, [allWishes, schedule]);
+  const wishByStaff = useMemo(
+    () =>
+      schedule
+        ? wishesOfPeriod(allWishes, schedule.period)
+        : new Map<string, StaffMonthlyShiftWish>(),
+    [allWishes, schedule]
+  );
 
   // 制約チェックは変更のたびに再計算する（割当・希望が変わるたび）。
   // 連勤・希望に加え、責任者ルールの未充足（担当勤務帯に minCount 未満の日）も同じ違反
@@ -410,7 +411,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       );
       if (!inheritance) {
         setAutoMessage(
-          `${pendingInheritance.year}年${pendingInheritance.month}月の確定版を読み出せなかったので、取り込めませんでした。`
+          `${pendingInheritance.period.label}の確定版を読み出せなかったので、取り込めませんでした。`
         );
         return;
       }
@@ -528,7 +529,13 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         minDayOff: limits.minDayOff,
         maxDayOffPerDay: limits.maxDayOffPerDay,
       });
-      return reason && dayOffReasonText(reason, style, { maxDayOffPerDay: limits.maxDayOffPerDay });
+      return (
+        reason &&
+        dayOffReasonText(reason, style, {
+          maxDayOffPerDay: limits.maxDayOffPerDay,
+          words: schedule.period.words,
+        })
+      );
     },
     [schedule, shiftIdByName, dayOffStyleOf, wishByStaff, limits]
   );
@@ -625,10 +632,10 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   };
 
   // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる。
-  // 前月の確定版から引き継いだ貢献度が高い人を先に処理する（休みの取得優先権に効く。詳しくは contributionPriority.ts）。
+  // 前月の確定版から引き継いだ★が高い人を先に処理する（休みの取得優先権に効く。詳しくは starPriority.ts）。
   // 並び順が効くステップ（grantsDayOffInStaffOrder）を実行したときだけ、優先したことを伝える。
   const handleRunStep = (step: AutoShiftStep) => {
-    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByContribution(
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByStars(
       subsetStaff,
       priorityStars
     );
@@ -652,7 +659,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   const handleGenerateCandidates = () => {
     if (!scheduleId) return;
     // 前月の確定版から引き継いだ★が高い人を先に処理する（handleRunStep と同じ優先度づけ）。
-    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByContribution(
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByStars(
       subsetStaff,
       priorityStars
     );
@@ -745,7 +752,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     if (!scheduleId || !apex || !schedule) return;
 
     const currentConfirmed = allReports.find(
-      (r) => r.id === ConfirmedSchedule.idFor(schedule.storeId, schedule.year, schedule.month)
+      (r) => r.id === ConfirmedSchedule.idFor(schedule.storeId, schedule.period)
     );
     if (currentConfirmed?.isVersion({ scheduleId, worldLineNodeId: apex.id })) {
       onOpenReview?.();
@@ -762,12 +769,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     )?.obj as MonthlyStaffSchedule | undefined;
     if (!apexSchedule) return;
 
-    const wishByStaffForApex = new Map<string, StaffMonthlyShiftWish>();
-    for (const w of allWishes) {
-      if (w.year === apexSchedule.year && w.month === apexSchedule.month) {
-        wishByStaffForApex.set(w.staffId, w);
-      }
-    }
+    const wishByStaffForApex = wishesOfPeriod(allWishes, apexSchedule.period);
     const reportConstraints = scheduleConstraintsOf({
       constraintSet: constraints,
       workShifts,
@@ -786,8 +788,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       {
         scheduleId,
         worldLineNodeId: apex.id,
-        year: apexSchedule.year,
-        month: apexSchedule.month,
+        period: apexSchedule.period,
         storeId: apexSchedule.storeId,
         ...draft,
         confirmedAt,
@@ -880,8 +881,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         className="e-confirm"
         onClick={() => void handleConfirm()}
         title={
-          "いま見ている版を、この月の確定版にします（すでに確定版があれば置き換わります）。" +
-          "翌月の勤務表は、確定版から引き継いで始まります"
+          `いま見ている版を、この${schedule.period.words.unit}の確定版にします（すでに確定版があれば置き換わります）。` +
+          `${schedule.period.words.next}の勤務表は、確定版から引き継いで始まります`
         }
       >
         🏁 確定する
@@ -891,7 +892,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           type={CONFIRMED_SCHEDULE_TYPE}
           id={confirmedVersion.id}
           url={reviewUrl}
-          label={`${schedule?.year ?? ""}年${schedule?.month ?? ""}月の振り返り`}
+          label={`${schedule.period.label}の振り返り`}
           openingPosition="bubble-side-left"
         >
           <span className="e-review-opener" title="ダブルクリックで振り返りを開く">
@@ -906,8 +907,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     <StyledContainer ref={containerRef} className={foldPanels ? "is-narrow" : undefined}>
       <div className="e-header">
         <h3>
-          {schedule.year}年{schedule.month}月の勤務表{" "}
-          <span className="e-sub">{schedule.storeId}</span>
+          {schedule.period.label}の勤務表{" "}
+          <span className="e-sub">{storeName}</span>
         </h3>
 
         {foldPanels && (
@@ -925,15 +926,15 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         {/* 見出し行には、スタッフ列の見え方ではなく勤務表（この月）そのものに紐づくものを置く */}
         {showPanels && (
         <div className="e-actions e-actions-left">
-          {/* この月のシフト希望（回収状況）。押す前から在るものなのでダブルクリックで開く */}
+          {/* この期のシフト希望（回収状況）。押す前から在るものなのでダブルクリックで開く。 */}
           {shiftWishesUrl && (
             <ObjectView
               type={SHIFT_WISH_MONTH_VIEW_TYPE}
-              url={shiftWishesUrl(schedule.year, schedule.month)}
-              label={`${schedule.year}年${schedule.month}月のシフト希望`}
+              url={shiftWishesUrl(schedule.period)}
+              label={`${schedule.period.label}のシフト希望`}
               openingPosition="bubble-side-right"
             >
-              <span className="e-link" title="ダブルクリックでこの月のシフト希望を開く">
+              <span className="e-link" title="ダブルクリックでこの期のシフト希望を開く">
                 シフト希望
               </span>
             </ObjectView>
@@ -942,16 +943,17 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           {/* 前月の確定版からの引き継ぎ。新しい確定版があれば取り込みを促す（precedingMonth.ts）。
               ★を休みの優先度に使うかは制約欄の「★優先」（limitSpecs）で切り替える。 */}
           <InheritanceView
+            words={schedule.period.words}
             inherited={
-              inherited?.yearMonth && {
-                ...inherited.yearMonth,
+              // 引き継ぎ元は、この勤務表の前の期（末尾はその最終日で終わっている）
+              inherited?.lastDay && {
+                period: schedule.period.previous(),
                 confirmedAt: inherited.confirmedAt,
               }
             }
             pending={
               pendingInheritance && {
-                year: pendingInheritance.year,
-                month: pendingInheritance.month,
+                period: pendingInheritance.period,
                 confirmedAt: confirmedAtOf(store, pendingInheritance),
               }
             }
@@ -963,7 +965,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
                   type={CONFIRMED_SCHEDULE_TYPE}
                   id={precedingConfirmed?.id ?? inherited.source.scheduleId}
                   url={precedingReviewUrl(inherited.source.scheduleId)}
-                  label={inherited.yearMonth ? `${inherited.yearMonth.year}年${inherited.yearMonth.month}月の振り返り` : "前月の振り返り"}
+                  label={`${schedule.period.previous().label}の振り返り`}
                   openingPosition="origin-side"
                   draggable={false}
                 >
@@ -1106,8 +1108,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
 
       {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く）。
           表が長くても開いた瞬間に見えるよう、バブルの下端に貼り付ける（.e-footer の sticky） */}
-      {(worldLineUrl || treeUrl) && (
-        <div className="e-footer">
+      <div className="e-footer">
           {worldLineUrl && (
               <ObjectView
                 type={SCHEDULE_WORLD_LINE_VIEW_TYPE}
@@ -1137,7 +1138,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
               </ObjectView>
           )}
       </div>
-      )}
+
     </StyledContainer>
   );
 };

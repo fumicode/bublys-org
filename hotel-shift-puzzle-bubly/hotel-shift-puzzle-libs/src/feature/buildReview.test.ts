@@ -1,3 +1,4 @@
+import { CalendarMonthPeriod } from "@bublys-org/hotel-shift-puzzle-model";
 import {
   MonthlyStaffSchedule,
   StaffMonthlyShiftWish,
@@ -22,8 +23,7 @@ describe('buildReview（確定時の振り返りの計算）', () => {
     MonthlyStaffSchedule.create({
       id: 'sched-1',
       storeId: 'store-1',
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     })
       .setRequired(day1, '早番', 1)
       .setRequired(day2, '中番', 2)
@@ -41,8 +41,7 @@ describe('buildReview（確定時の振り返りの計算）', () => {
 
   const wishA = StaffMonthlyShiftWish.create({
     staffId: 'staff-A',
-    year: 2026,
-    month: 6,
+    period: CalendarMonthPeriod.of(2026, 6),
   }).setPreference(day1, 'day-off', 'want'); // 6/1 は休みたいが早番に入った＝譲歩
 
   const staffIds = ['staff-A', 'staff-B', 'staff-C', 'staff-D'];
@@ -110,7 +109,7 @@ describe('buildReview（確定時の振り返りの計算）', () => {
     });
 
     // staff-A: 譲歩2件(連勤+希望)・繁忙日1回(6/2出勤) → 2*2+1=5
-    expect(report.contributions).toEqual([
+    expect(report.stars).toEqual([
       { staffId: 'staff-A', compromiseCount: 2, busyDayCount: 1, score: 5 },
       { staffId: 'staff-B', compromiseCount: 0, busyDayCount: 1, score: 1 },
       { staffId: 'staff-C', compromiseCount: 0, busyDayCount: 1, score: 1 },
@@ -122,8 +121,7 @@ describe('buildReview（確定時の振り返りの計算）', () => {
     const empty = MonthlyStaffSchedule.create({
       id: 'sched-2',
       storeId: 'store-1',
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
     const report = buildReview({
       schedule: empty,
@@ -132,6 +130,6 @@ describe('buildReview（確定時の振り返りの計算）', () => {
     });
     expect(report.busyDayContributions).toEqual([]);
     expect(report.compromises).toEqual([]);
-    expect(report.contributions).toEqual([]);
+    expect(report.stars).toEqual([]);
   });
 });

@@ -13,6 +13,8 @@ type ScheduleReportViewProps = {
   report: ConfirmedSchedule;
   /** staffId → 表示名（解決済み。無ければ staffId を出す） */
   nameOf: (staffId: string) => string;
+  /** 店舗の名前（storeId は人に見せない） */
+  storeName: string;
   /** 配慮メモ欄の編集（保存はシェル経由で feature 層が担う）。省略すると読むだけ */
   onChangeNote?: (staffId: string, text: string) => void;
   /** タイトルの変更（空にすると既定の "{年}年{月}" に戻る）。省略すると読むだけ */
@@ -38,6 +40,7 @@ type ScheduleReportViewProps = {
 export const ReviewView: FC<ScheduleReportViewProps> = ({
   report,
   nameOf,
+  storeName,
   onChangeNote,
   onRename,
   onChangeWeights,
@@ -117,7 +120,7 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
       </span>
     );
   };
-  const dayCount = new Date(report.year, report.month, 0).getDate();
+  const dayCount = report.period.length;
 
   return (
     <StyledWrap>
@@ -133,14 +136,14 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
                 if (e.nativeEvent.isComposing) return; // IME確定のEnterでは確定しない
                 if (e.key === "Enter") e.currentTarget.blur();
               }}
-              placeholder={`${report.year}年${report.month}月`}
+              placeholder={report.period.label}
             />
           ) : (
             <span className="e-title-text">{report.title}</span>
           )}
         </div>
         <span className="e-sub">
-          {report.year}年{report.month}月 / {report.storeId}
+          {report.period.label} / {storeName}
           {confirmedAt !== undefined && (
             <span className="e-confirmed-at"> ・ 確定 {formatConfirmedAt(confirmedAt)}</span>
           )}
@@ -151,7 +154,7 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
       <section className="e-section">
         <p
           className="e-rule"
-          title="貢献度（★）はその月に無理を引き受けてくれたことを称える数です。貢献度が高い人ほど、翌月の自動シフトで休みを先に置けます（制約欄の「貢献度優先」）"
+          title={`★はその${report.period.words.unit}に無理を引き受けてくれたことを称える数です。★が高い人ほど、${report.period.words.next}の自動シフトで休みを先に置けます（制約欄の「★優先」）`}
         >
           譲歩1件で★{weightControl("compromise", "譲歩")}・繁忙日1回で★{weightControl("busy", "繁忙日")}
         </p>
@@ -160,7 +163,7 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
           <ReviewMark kind="busy" /> 繁忙日に出勤
         </p>
 
-        {report.contributions.length === 0 ? (
+        {report.stars.length === 0 ? (
           <p className="e-empty">対象スタッフがいません。</p>
         ) : (
           <ul className="e-person-list">
@@ -169,12 +172,11 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
               <span />
               <ReviewDayScale dayCount={dayCount} />
             </li>
-            {report.contributions.map((s) => {
+            {report.stars.map((s) => {
               const expanded = expandedStaffIds.has(s.staffId);
               const hasNote = report.noteFor(s.staffId).trim().length > 0;
               const strip = dayStripOf({
-                year: report.year,
-                month: report.month,
+                period: report.period,
                 staffId: s.staffId,
                 compromises: report.compromises,
                 busyDayContributions: report.busyDayContributions,
@@ -199,7 +201,7 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
                       {hasNote && <span className="e-note-dot" />}
                     </span>
                     <ReviewDayStrip strip={strip} />
-                    <span className="e-monthly" title="日に紐づかない譲歩（月の休日不足など）。中身は行を開くと読めます">
+                    <span className="e-monthly" title={`日に紐づかない譲歩（${report.period.words.unit}の休日不足など）。中身は行を開くと読めます`}>
                       {strip.monthlyCount > 0 && (
                         <>
                           <ReviewMark kind="compromise" />

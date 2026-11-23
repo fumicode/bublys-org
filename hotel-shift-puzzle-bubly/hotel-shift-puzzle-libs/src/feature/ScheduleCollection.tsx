@@ -6,11 +6,17 @@ import {
   MonthlyStaffSchedule,
   ConstraintSet,
   ConfirmedSchedule,
+  HOTEL_FORMAT,
+  Store,
+  StoreFormat,
+  type SchedulePeriod,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleListView } from "../ui/ScheduleListView.js";
-import { useObject, useObjects, useObjectRepo } from "../objects/repository.js";
+import { useObject, useObjects, useObjectRepo, useRemovedIds } from "../objects/repository.js";
 import { createSchedule } from "./createSchedule.js";
+import { todayWorkingDay } from "./today.js";
+import { storesForNewSchedule } from "./storesForNewSchedule.js";
 import {
   captureInheritance,
   pendingInheritanceOf,
@@ -18,23 +24,44 @@ import {
 } from "./precedingMonth.js";
 import {
   SCHEDULE_TYPE,
+  STORE_TYPE,
   CONFIRMED_SCHEDULE_TYPE,
   CONSTRAINT_SET_TYPE,
   GLOBAL_CONSTRAINT_SET_ID,
 } from "../objects/hotelObjects.js";
 
-export const ScheduleCollection: FC = () => {
+const DEFAULT_FORMATS: readonly StoreFormat[] = [HOTEL_FORMAT];
+
+export const ScheduleCollection: FC<{
+  /** このデプロイで選べる形態（組織の呼び方と、既定の店舗を出すかが決まる）。省略時はホテルだけ */
+  formats?: readonly StoreFormat[];
+}> = ({ formats = DEFAULT_FORMATS }) => {
   const store = useAppStore();
   const schedules = useObjects<MonthlyStaffSchedule>(SCHEDULE_TYPE);
   const scheduleActions = useObjectRepo<MonthlyStaffSchedule>(SCHEDULE_TYPE);
   const reports = useObjects<ConfirmedSchedule>(CONFIRMED_SCHEDULE_TYPE);
+  const recordedStores = useObjects<Store>(STORE_TYPE);
+  const removedStoreIds = useRemovedIds(STORE_TYPE);
+  const today = useMemo(() => todayWorkingDay(), []);
+  const stores = useMemo(
+    () =>
+      storesForNewSchedule(
+        recordedStores,
+        schedules,
+        removedStoreIds,
+        formats.some((f) => f.id === HOTEL_FORMAT.id)
+      ),
+    [recordedStores, schedules, removedStoreIds, formats]
+  );
+  const storeNameOf = (storeId: string) =>
+    Store.resolve(recordedStores, storeId, removedStoreIds).name;
   // 新しい勤務表はグローバルの制約セットを写して始まるので、何日写すかもそれで決める
   const globalConstraints = useObject<ConstraintSet>(CONSTRAINT_SET_TYPE, GLOBAL_CONSTRAINT_SET_ID);
 
   // 勤務表を作る＝その世界が生まれる。勤務表・勤務帯セット・可能勤務帯・固定メンバー
   // （そのときのスタッフ名簿）が1ノードにまとまる。詳しくは createSchedule.ts。
   // 勤務表は、前月の確定版から引き継いで始まる（月末の勤務と★。precedingMonth.ts）。
-  const handleCreate = async (params: { storeId: string; year: number; month: number }) => {
+  const handleCreate = async (params: { storeId: string; period: SchedulePeriod }) => {
     const confirmed = precedingConfirmedOf(reports, params);
     // 確定版が読めなくても勤務表は作る（引き継がず、今月1日から数える。取り込みは後からできる）
     const inheritance = confirmed
@@ -79,6 +106,10 @@ export const ScheduleCollection: FC = () => {
         schedules={schedules}
         confirmedScheduleIds={confirmedScheduleIds}
         pendingScheduleIds={pendingScheduleIds}
+        stores={stores}
+        storeNoun={StoreFormat.nounFor(formats)}
+        storeNameOf={storeNameOf}
+        today={today}
         onCreate={handleCreate}
         onRemove={handleRemove}
       />

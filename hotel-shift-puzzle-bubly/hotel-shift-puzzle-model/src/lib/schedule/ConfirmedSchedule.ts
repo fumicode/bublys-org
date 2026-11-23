@@ -1,12 +1,12 @@
 /**
- * ConfirmedSchedule — 確定版（店舗×月で1つ）とその振り返り
+ * ConfirmedSchedule — 確定版（店舗×期で1つ）とその振り返り
  *
- * 「確定する」と、いま見ている勤務表の版（世界線のノード）が、その店舗×月の確定版になる。
- * 確定版は**店舗×月で1つ**（#231）。ID は店舗と年月から決まり（{@link ConfirmedSchedule.idFor}）、
+ * 「確定する」と、いま見ている勤務表の版（世界線のノード）が、その店舗×期の確定版になる。
+ * 確定版は**店舗×期で1つ**（#231・#234）。ID は店舗と期から決まり（{@link ConfirmedSchedule.idFor}）、
  * もう一度確定すると同じ ID のまま置き換わる（{@link ConfirmedSchedule.confirm}）。別の勤務表で
  * 確定しても置き換わる。どの勤務表のどの版かは scheduleId / worldLineNodeId が持つ。
  *
- * 振り返り（譲歩 #87・繁忙日対応 #88・貢献度 #89）は、確定版を「その月どうだったか」の
+ * 振り返り（譲歩 #87・繁忙日対応 #88・★ #89）は、確定版を「その月どうだったか」の
  * 角度から見たもの。確定時点のスナップショットとして持ち、以降スタッフの希望や勤務表が
  * 変わっても変化しない。置き換えると新しい版の振り返りになり、古い版の振り返りは残さない。
  * 自由記述の配慮メモ（considerationNotes）・タイトル（title）・譲歩/繁忙日の重み
@@ -14,16 +14,23 @@
  * 削除は集約自体をリポジトリから取り除く操作（feature 層が useObjectRepo.remove で行う）
  * なので、ここにはメソッドを持たない。
  *
- * 重みはシフト管理者によって貢献度の感じ方が異なるため直接編集できるようにしている。
+ * 重みはシフト管理者によって★の感じ方が異なるため直接編集できるようにしている。
  * reweight() は譲歩・繁忙日の生データ（compromises/busyDayContributions/各エントリの
- * compromiseCount/busyDayCount）は変えず、重みと contributions の score だけを
+ * compromiseCount/busyDayCount）は変えず、重みと stars の score だけを
  * 再計算する（「何が起きたか」という事実は確定時点のまま、「どう評価するか」という
  * 重みだけを後から調整できる）。
  *
- * state は plain だけでできているが、保存形（{@link ConfirmedSchedulePlain}）は旧形式の名前も
- * 読めるよう別に定義する。
+ * state は期をインスタンス（SchedulePeriod）で持つ。保存形（{@link ConfirmedSchedulePlain}）は
+ * 別に定義し、暦月の期は前と同じ year/month で書く（{@link periodFieldsOf}）。旧形式の名前も読む。
  * 不変。setNote / rename / reweight 以外の更新手段は無い（compromises 等は create 時に一括で決まる）。
  */
+
+import {
+  type SchedulePeriod,
+  periodFieldsOf,
+  periodFromFields,
+  type PeriodFields,
+} from "./SchedulePeriod.js";
 
 /**
  * 譲歩エントリ。#87
@@ -50,16 +57,13 @@ export type BusyDayEntry = {
   workedStaffIds: string[];
 };
 
-/** スタッフごとの貢献度（譲歩回数・繁忙日出勤回数の加重合計）。UI では★アイコンで表す。#89 */
-export type ContributionEntry = {
+/** スタッフごとの★（譲歩回数・繁忙日出勤回数の加重合計）。#89 */
+export type StarEntry = {
   staffId: string;
   compromiseCount: number;
   busyDayCount: number;
   score: number;
 };
-
-/** @deprecated ContributionEntry に改名。保存形との互換のため残す */
-export type StarEntry = ContributionEntry;
 
 /** 譲歩1件あたりの重みの既定値（#89 スコア算出） */
 export const DEFAULT_COMPROMISE_WEIGHT = 2;
@@ -73,21 +77,20 @@ export type ConfirmedVersion = {
 };
 
 export type ConfirmedScheduleState = {
-  /** 店舗×月で一意（{@link ConfirmedSchedule.idFor}） */
+  /** 店舗×期で一意（{@link ConfirmedSchedule.idFor}） */
   id: string;
   /** 確定版を持つ勤務表 */
   scheduleId: string;
   /** 確定版の世界線ノードID（その勤務表の世界線の中の、確定した版） */
   worldLineNodeId: string;
-  year: number;
-  /** 1-12 */
-  month: number;
+  /** 確定した勤務表の期 */
+  period: SchedulePeriod;
   storeId: string;
-  /** 表示名。既定は "{year}年{month}月" だが rename で変更できる */
+  /** 表示名。既定は期の呼び方（"2026年6月" など）だが rename で変更できる */
   title: string;
   compromises: CompromiseEntry[];
   busyDayContributions: BusyDayEntry[];
-  contributions: ContributionEntry[];
+  stars: StarEntry[];
   /** staffId → 自由記述の配慮メモ（確定後も編集可） */
   considerationNotes: Record<string, string>;
   /** 譲歩1件あたりの重み（確定後も reweight で編集可） */
@@ -101,62 +104,60 @@ export type ConfirmedScheduleState = {
   confirmedAt?: number;
 };
 
-/** シリアライズ用。保存キーは旧名 stars のまま（世界線を壊さない） */
-export type ConfirmedSchedulePlain = Omit<ConfirmedScheduleState, "contributions"> & {
-  stars?: ContributionEntry[];
-  /** 旧形式：contributionScores で保存されたデータも読む */
-  contributionScores?: ContributionEntry[];
+/** シリアライズ用。期は暦月の期なら year/month、それ以外なら period で書く */
+export type ConfirmedSchedulePlain = PeriodFields &
+  Omit<ConfirmedScheduleState, "period" | "stars"> & {
+  stars?: StarEntry[];
+  /** 旧形式：★を「貢献度スコア」と呼んでいた頃の名前。読むときだけ受け付ける */
+  contributionScores?: StarEntry[];
 };
 
 export class ConfirmedSchedule {
   constructor(readonly state: ConfirmedScheduleState) {}
 
-  /** 店舗×月で一意な ID（"store-1:2026-06"）。確定し直しても変わらない */
-  static idFor(storeId: string, year: number, month: number): string {
-    return `${storeId}:${year}-${String(month).padStart(2, "0")}`;
+  /**
+   * 店舗×期で一意な ID（"store-1:2026-06" / "store-1:four-week:2026-06-07"）。確定し直しても変わらない。
+   * 暦月の期は期を入れる前と同じ ID になる（期のキーが "2026-06"）。
+   */
+  static idFor(storeId: string, period: SchedulePeriod): string {
+    return `${storeId}:${period.key}`;
   }
 
   /**
-   * その勤務表が引き継ぐ前月の確定版の ID（同じ店舗の、ちょうど1か月前）。1月の前月は前年12月。
-   * 2か月以上前を含めないのは、つながるのは直前の月末だけで、振り返るべきも直前の月だから。
+   * その勤務表が引き継ぐ前の期の確定版の ID（同じ店舗の、すぐ前の期）。暦月の期なら前月。
+   * 2期以上前を含めないのは、つながるのは直前の期の末尾だけで、振り返るべきも直前の期だから。
    */
-  static precedingIdFor(target: { storeId: string; year: number; month: number }): string {
-    const prev =
-      target.month === 1
-        ? { year: target.year - 1, month: 12 }
-        : { year: target.year, month: target.month - 1 };
-    return ConfirmedSchedule.idFor(target.storeId, prev.year, prev.month);
+  static precedingIdFor(target: { storeId: string; period: SchedulePeriod }): string {
+    return ConfirmedSchedule.idFor(target.storeId, target.period.previous());
   }
 
   /** 既定のタイトル（未命名時・rename で空にしたときのフォールバック） */
-  static defaultTitle(year: number, month: number): string {
-    return `${year}年${month}月`;
+  static defaultTitle(period: SchedulePeriod): string {
+    return period.label;
   }
 
   /** 確定時に計算済みのデータから確定版を作る（配慮メモは空、タイトルは既定値で始まる） */
   static create(params: {
     scheduleId: string;
     worldLineNodeId: string;
-    year: number;
-    month: number;
+    period: SchedulePeriod;
     storeId: string;
     compromises: CompromiseEntry[];
     busyDayContributions: BusyDayEntry[];
-    contributions: ContributionEntry[];
+    stars: StarEntry[];
     /** 確定時刻（epoch ms）。時刻の取得は上位層の仕事 */
     confirmedAt?: number;
   }): ConfirmedSchedule {
     return new ConfirmedSchedule({
-      id: ConfirmedSchedule.idFor(params.storeId, params.year, params.month),
+      id: ConfirmedSchedule.idFor(params.storeId, params.period),
       scheduleId: params.scheduleId,
       worldLineNodeId: params.worldLineNodeId,
-      year: params.year,
-      month: params.month,
+      period: params.period,
       storeId: params.storeId,
-      title: ConfirmedSchedule.defaultTitle(params.year, params.month),
+      title: ConfirmedSchedule.defaultTitle(params.period),
       compromises: params.compromises,
       busyDayContributions: params.busyDayContributions,
-      contributions: params.contributions,
+      stars: params.stars,
       considerationNotes: {},
       compromiseWeight: DEFAULT_COMPROMISE_WEIGHT,
       busyDayWeight: DEFAULT_BUSY_DAY_WEIGHT,
@@ -165,7 +166,7 @@ export class ConfirmedSchedule {
   }
 
   /**
-   * 確定する。その店舗×月にすでに確定版（current）があれば、新しい版で置き換える。
+   * 確定する。その店舗×期にすでに確定版（current）があれば、新しい版で置き換える。
    * 置き換えても、手で書いた部分（タイトル・配慮メモ・譲歩/繁忙日の重み）は引き継ぎ、
    * ★は引き継いだ重みで出し直す。取り消しは無い（差し替えたければ別の版を確定する）。
    */
@@ -176,7 +177,7 @@ export class ConfirmedSchedule {
     const fresh = ConfirmedSchedule.create(params);
     if (!current) return fresh;
     if (current.id !== fresh.id) {
-      throw new Error(`別の店舗・月の確定版は置き換えられません（${current.id} → ${fresh.id}）`);
+      throw new Error(`別の店舗・期の確定版は置き換えられません（${current.id} → ${fresh.id}）`);
     }
     return new ConfirmedSchedule({
       ...fresh.state,
@@ -210,13 +211,9 @@ export class ConfirmedSchedule {
     return this.state.worldLineNodeId;
   }
 
-  get year(): number {
-    return this.state.year;
-  }
-
-  /** 1-12 */
-  get month(): number {
-    return this.state.month;
+  /** 確定した勤務表の期 */
+  get period(): SchedulePeriod {
+    return this.state.period;
   }
 
   get storeId(): string {
@@ -234,13 +231,13 @@ export class ConfirmedSchedule {
 
   /**
    * タイトルを変更した新インスタンスを返す。不変。
-   * 空文字（trim後）なら既定のタイトル（"{year}年{month}月"）に戻す。
+   * 空文字（trim後）なら既定のタイトル（期の呼び方）に戻す。
    */
   rename(title: string): ConfirmedSchedule {
     const trimmed = title.trim();
     return new ConfirmedSchedule({
       ...this.state,
-      title: trimmed || ConfirmedSchedule.defaultTitle(this.state.year, this.state.month),
+      title: trimmed || ConfirmedSchedule.defaultTitle(this.state.period),
     });
   }
 
@@ -252,13 +249,13 @@ export class ConfirmedSchedule {
     return this.state.busyDayContributions;
   }
 
-  get contributions(): ContributionEntry[] {
-    return this.state.contributions;
+  get stars(): StarEntry[] {
+    return this.state.stars;
   }
 
-  /** そのスタッフの貢献度（スコアの行が無ければ 0） */
-  contributionOf(staffId: string): number {
-    return this.state.contributions.find((s) => s.staffId === staffId)?.score ?? 0;
+  /** そのスタッフの★（スコアの行が無ければ 0） */
+  starsOf(staffId: string): number {
+    return this.state.stars.find((s) => s.staffId === staffId)?.score ?? 0;
   }
 
   get compromiseWeight(): number {
@@ -270,7 +267,7 @@ export class ConfirmedSchedule {
   }
 
   /**
-   * 譲歩・繁忙日の重みを変更し、貢献度（contributions の score、降順の並び）を
+   * 譲歩・繁忙日の重みを変更し、★（stars の score、降順の並び）を
    * 再計算した新インスタンスを返す。不変。負の重みは 0 に丸める。
    * 生データ（compromises/busyDayContributions/各エントリの compromiseCount/busyDayCount）は
    * 変えない（「何が起きたか」は確定時点のまま、「どう評価するか」だけを調整する）。
@@ -278,14 +275,14 @@ export class ConfirmedSchedule {
   reweight(compromiseWeight: number, busyDayWeight: number): ConfirmedSchedule {
     const w1 = Math.max(0, compromiseWeight);
     const w2 = Math.max(0, busyDayWeight);
-    const contributions = this.state.contributions
+    const stars = this.state.stars
       .map((s) => ({ ...s, score: s.compromiseCount * w1 + s.busyDayCount * w2 }))
       .sort((a, b) => b.score - a.score);
     return new ConfirmedSchedule({
       ...this.state,
       compromiseWeight: w1,
       busyDayWeight: w2,
-      contributions,
+      stars,
     });
   }
 
@@ -314,8 +311,8 @@ export class ConfirmedSchedule {
       id: this.state.id,
       scheduleId: this.state.scheduleId,
       worldLineNodeId: this.state.worldLineNodeId,
-      year: this.state.year,
-      month: this.state.month,
+      // 暦月の期は前と同じ year/month で書く（保存済みの確定版と同じ形・同じハッシュ）
+      ...periodFieldsOf(this.state.period),
       storeId: this.state.storeId,
       title: this.state.title,
       compromises: this.state.compromises.map((c) => ({ ...c, dayKeys: [...c.dayKeys] })),
@@ -323,7 +320,7 @@ export class ConfirmedSchedule {
         ...b,
         workedStaffIds: [...b.workedStaffIds],
       })),
-      stars: this.state.contributions.map((s) => ({ ...s })),
+      stars: this.state.stars.map((s) => ({ ...s })),
       considerationNotes: { ...this.state.considerationNotes },
       compromiseWeight: this.state.compromiseWeight,
       busyDayWeight: this.state.busyDayWeight,
@@ -332,20 +329,20 @@ export class ConfirmedSchedule {
   }
 
   static fromPlain(plain: ConfirmedSchedulePlain): ConfirmedSchedule {
+    const period = periodFromFields(plain);
     return new ConfirmedSchedule({
       id: plain.id,
       scheduleId: plain.scheduleId,
       worldLineNodeId: plain.worldLineNodeId,
-      year: plain.year,
-      month: plain.month,
+      period,
       storeId: plain.storeId,
-      title: plain.title ?? ConfirmedSchedule.defaultTitle(plain.year, plain.month),
+      title: plain.title ?? ConfirmedSchedule.defaultTitle(period),
       compromises: plain.compromises.map((c) => ({ ...c, dayKeys: [...c.dayKeys] })),
       busyDayContributions: plain.busyDayContributions.map((b) => ({
         ...b,
         workedStaffIds: [...b.workedStaffIds],
       })),
-      contributions: (plain.stars ?? plain.contributionScores ?? []).map((s) => ({ ...s })),
+      stars: (plain.stars ?? plain.contributionScores ?? []).map((s) => ({ ...s })),
       considerationNotes: { ...(plain.considerationNotes ?? {}) },
       compromiseWeight: plain.compromiseWeight ?? DEFAULT_COMPROMISE_WEIGHT,
       busyDayWeight: plain.busyDayWeight ?? DEFAULT_BUSY_DAY_WEIGHT,

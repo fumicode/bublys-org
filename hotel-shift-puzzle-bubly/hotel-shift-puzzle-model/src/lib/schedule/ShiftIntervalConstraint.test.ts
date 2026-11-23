@@ -7,6 +7,7 @@ import {
   isShiftIntervalConstraintType,
 } from './ShiftIntervalConstraint.js';
 import { PrecedingMonthTail } from './PrecedingMonthTail.js';
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 describe('ShiftIntervalConstraint（勤務間インターバル制約）の使い方', () => {
   const YEAR = 2026;
@@ -31,8 +32,7 @@ describe('ShiftIntervalConstraint（勤務間インターバル制約）の使�
     MonthlyStaffSchedule.create({
       id: 'sched-1',
       storeId: 'store-1',
-      year: YEAR,
-      month: MONTH,
+      period: CalendarMonthPeriod.of(YEAR, MONTH),
     });
 
   const day = (d: number) => WorkingDay.of(YEAR, MONTH, d);
@@ -195,8 +195,7 @@ describe('ShiftIntervalConstraint：前月とつないだとき（月跨ぎ）',
     let s = MonthlyStaffSchedule.create({
       id: 'sched-1',
       storeId: 'store-1',
-      year: YEAR,
-      month: MONTH,
+      period: CalendarMonthPeriod.of(YEAR, MONTH),
     });
     shifts.forEach((shift, i) => {
       s =
@@ -216,12 +215,11 @@ describe('ShiftIntervalConstraint：前月とつないだとき（月跨ぎ）',
     const may = MonthlyStaffSchedule.create({
       id: 'may',
       storeId: 'store-1',
-      year: YEAR,
-      month: 5,
+      period: CalendarMonthPeriod.of(YEAR, 5),
     }).assignShift(staffId, WorkingDay.of(YEAR, 5, 31), 'may-shift');
     return PrecedingMonthTail.capture({
       source: { scheduleId: 'may', worldLineNodeId: 'n' },
-      contributions: [],
+      stars: [],
       schedule: may,
       shiftNameOf: () => shiftName,
       length: 7,

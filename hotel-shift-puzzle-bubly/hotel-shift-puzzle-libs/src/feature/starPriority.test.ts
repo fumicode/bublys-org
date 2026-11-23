@@ -1,5 +1,6 @@
+import { CalendarMonthPeriod } from "@bublys-org/hotel-shift-puzzle-model";
 import { Staff, ConfirmedSchedule } from '@bublys-org/hotel-shift-puzzle-model';
-import { prioritizeStaffByContribution as prioritizeStaffByStars } from './contributionPriority.js';
+import { prioritizeStaffByStars } from './starPriority.js';
 
 const staffA = new Staff({ id: 'staff-A', name: 'A' });
 const staffB = new Staff({ id: 'staff-B', name: 'B' });
@@ -11,18 +12,17 @@ const reportWithScores = (scores: { staffId: string; score: number }[]) =>
   ConfirmedSchedule.create({
     scheduleId: 'sched-1',
     worldLineNodeId: 'node-1',
-    year: 2026,
-    month: 6,
+    period: CalendarMonthPeriod.of(2026, 6),
     storeId: 'store-1',
     compromises: [],
     busyDayContributions: [],
-    contributions: scores.map((s) => ({
+    stars: scores.map((s) => ({
       staffId: s.staffId,
       compromiseCount: 0,
       busyDayCount: 0,
       score: s.score,
     })),
-  }).contributions;
+  }).stars;
 
 const idsOf = (staff: Staff[]) => staff.map((s) => s.id);
 

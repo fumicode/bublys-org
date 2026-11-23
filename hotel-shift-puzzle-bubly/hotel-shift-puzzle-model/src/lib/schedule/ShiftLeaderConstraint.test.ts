@@ -2,13 +2,13 @@ import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 import { ShiftLeaderRule } from "./ShiftLeaderRule.js";
 import { ShiftLeaderConstraint } from "./ShiftLeaderConstraint.js";
 import { ConstraintViolation } from "./ConstraintViolation.js";
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 describe("ShiftLeaderConstraint の違反の要約", () => {
   const schedule = MonthlyStaffSchedule.create({
     id: "sched-1",
     storeId: "store-1",
-    year: 2026,
-    month: 6,
+    period: CalendarMonthPeriod.of(2026, 6),
   });
   const rule = (minCount: number) =>
     new ShiftLeaderRule({

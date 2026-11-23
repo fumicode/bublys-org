@@ -11,6 +11,7 @@ import {
   hotelCellRole,
   ModelClassDiagram,
   hotelNestedScope,
+  StoreCollection,
   StaffCollection,
   StaffDetail,
   WorkShiftCollection,
@@ -35,6 +36,7 @@ import {
   ShiftIntervalRuleView,
   WorldFilePanel,
 } from "@bublys-org/hotel-shift-puzzle-libs";
+import { availablePeriodRuleKinds, availableStoreFormats } from "./storeFormats.js";
 // バブル URL スキーム（app 層で一元管理）。import すると同時にオブジェクト URL の
 // registerObjectUrl 副作用も走る。
 import {
@@ -46,7 +48,8 @@ import {
   constraintBubbleUrlOf,
   scheduleWorldLineTreeUrl,
   staffShiftWishUrl,
-  shiftWishMonthUrl,
+  shiftWishPeriodUrl,
+  periodOfWishParams,
   scheduleStaffDetailUrl,
   scheduleReviewUrl,
   scheduleUrl,
@@ -59,6 +62,12 @@ const withObjects = (node: ReactNode) => (
 );
 
 // --- スタッフ一覧バブル ---
+// --- 店舗一覧バブル（勤務表の外のデータ。選べる形態・区切り方はデプロイが決める） ---
+const StoreListBubble: BubbleRoute["Component"] = () =>
+  withObjects(
+    <StoreCollection formats={availableStoreFormats} ruleKinds={availablePeriodRuleKinds} />
+  );
+
 const StaffListBubble: BubbleRoute["Component"] = () => withObjects(<StaffCollection />);
 
 // --- スタッフ詳細バブル ---
@@ -67,7 +76,7 @@ const StaffDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return withObjects(
     <StaffDetail
       staffId={staffId}
-      shiftWishUrl={(year, month) => staffShiftWishUrl(staffId, year, month)}
+      shiftWishUrl={(period) => staffShiftWishUrl(staffId, period)}
     />
   );
 };
@@ -79,41 +88,39 @@ const ScheduleStaffDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
     <StaffDetail
       staffId={staffId}
       scheduleId={scheduleId}
-      shiftWishUrl={(year, month) => staffShiftWishUrl(staffId, year, month)}
+      shiftWishUrl={(period) => staffShiftWishUrl(staffId, period)}
     />
   );
 };
 
-// --- シフト希望の入口バブル（希望を集める月が並ぶ） ---
+// --- シフト希望の入口バブル（希望を集める期が並ぶ） ---
 const ShiftWishListBubble: BubbleRoute["Component"] = () =>
-  withObjects(<ShiftWishMonthList monthUrl={shiftWishMonthUrl} />);
+  withObjects(<ShiftWishMonthList periodUrl={shiftWishPeriodUrl} />);
 
-// --- その月のシフト希望一覧バブル（スタッフ全員 × 回収状況） ---
-// 対象の月は URL（:year/:month）で決まる。別の月・別の人は、それぞれ別のバブルとして開く。
+const invalidPeriod = (
+  <div style={{ padding: 16, color: "#666" }}>期の指定が正しくありません</div>
+);
+
+// --- その期のシフト希望一覧バブル（スタッフ全員 × 回収状況） ---
+// 対象の期は URL（期のキー、または期を入れる前の :year/:month）で決まる。
+// 別の期・別の人は、それぞれ別のバブルとして開く。
 const ShiftWishMonthBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  const year = Number(bubble.params.year);
-  const month = Number(bubble.params.month);
-  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
-    return <div style={{ padding: 16, color: "#666" }}>月の指定が正しくありません</div>;
-  }
+  const period = periodOfWishParams(bubble.params);
+  if (!period) return invalidPeriod;
   return withObjects(
     <ShiftWishStaffList
-      year={year}
-      month={month}
-      wishUrl={(staffId) => staffShiftWishUrl(staffId, year, month)}
+      period={period}
+      wishUrl={(staffId) => staffShiftWishUrl(staffId, period)}
     />
   );
 };
 
-// --- スタッフ月別シフト希望エディタバブル ---
-const ShiftWishBubble: BubbleRoute["Component"] = ({ bubble }) =>
-  withObjects(
-    <ShiftWishEditor
-      staffId={bubble.params.staffId}
-      year={Number(bubble.params.year)}
-      month={Number(bubble.params.month)}
-    />
-  );
+// --- スタッフの期ごとのシフト希望エディタバブル ---
+const ShiftWishBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const period = periodOfWishParams(bubble.params);
+  if (!period) return invalidPeriod;
+  return withObjects(<ShiftWishEditor staffId={bubble.params.staffId} period={period} />);
+};
 
 // --- 勤務帯リストバブル（リスト内で追加・編集） ---
 const WorkShiftListBubble: BubbleRoute["Component"] = () => withObjects(<WorkShiftCollection />);
@@ -130,7 +137,7 @@ const ConstraintSetBubble: BubbleRoute["Component"] = () =>
 
 // --- 勤務表一覧バブル（複数の勤務表を作成・管理） ---
 const ScheduleListBubble: BubbleRoute["Component"] = () =>
-  withObjects(<ScheduleCollection />);
+  withObjects(<ScheduleCollection formats={availableStoreFormats} />);
 
 /**
  * 候補集合の計算 worker を作る。worker の作り方（new Worker + import.meta.url）は
@@ -175,7 +182,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
       scheduleId={scheduleId}
       onOpenWorldLine={openWorldLine}
       workingStaffUrl={workingStaffUrl}
-      shiftWishesUrl={shiftWishMonthUrl}
+      shiftWishesUrl={shiftWishPeriodUrl}
       worldLineUrl={worldLineUrl}
       treeUrl={treeUrl}
       bubbleUrlOf={(kind, key) => constraintBubbleUrlOf(scheduleId, kind, key)}
@@ -297,7 +304,8 @@ const LegacyScheduleShiftIntervalRuleBubble: BubbleRoute["Component"] = ({
 
 // --- 勤務表ファイルバブル（世界線ごとローカルファイルへ保存・読み込み） ---
 // 世界全体を扱うので勤務表 ID は取らない。Provider 配下に置くのは他バブルと同じ。
-const WorldFileBubble: BubbleRoute["Component"] = () => withObjects(<WorldFilePanel />);
+const WorldFileBubble: BubbleRoute["Component"] = () =>
+  withObjects(<WorldFilePanel formats={availableStoreFormats} />);
 
 // --- 世界線インスペクタ（デバッグ用） ---
 // 読み取り専用。Provider は要らない（Redux と IndexedDB を直接覗くだけ）が、
@@ -329,10 +337,14 @@ const ModelClassDiagramBubble: BubbleRoute["Component"] = () =>
 
 /** このバブリのバブルルート定義 */
 export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
+  // 希望のバブルは期のキーで開く。:year/:month は期を入れる前の URL（保存済みの配置に残っている）
+  { pattern: "hotel-shift-puzzle/staffs/:staffId/shift-wish/:periodKey", type: "staff-shift-wish", Component: ShiftWishBubble },
   { pattern: "hotel-shift-puzzle/staffs/:staffId/shift-wish/:year/:month", type: "staff-shift-wish", Component: ShiftWishBubble },
+  { pattern: "hotel-shift-puzzle/shift-wishes/:periodKey", type: "shift-wish-month", Component: ShiftWishMonthBubble },
   { pattern: "hotel-shift-puzzle/shift-wishes/:year/:month", type: "shift-wish-month", Component: ShiftWishMonthBubble },
   { pattern: "hotel-shift-puzzle/shift-wishes", type: "shift-wish-list", Component: ShiftWishListBubble },
   { pattern: "hotel-shift-puzzle/staffs/:staffId", type: "staff", Component: StaffDetailBubble },
+  { pattern: "hotel-shift-puzzle/stores", type: "store-list", Component: StoreListBubble },
   { pattern: "hotel-shift-puzzle/staffs", type: "staff-list", Component: StaffListBubble },
   { pattern: "hotel-shift-puzzle/work-shifts", type: "work-shift-list", Component: WorkShiftListBubble },
   // 制約1つぶんのバブル。具体的な pattern を先に置く（constraints 単体より上）

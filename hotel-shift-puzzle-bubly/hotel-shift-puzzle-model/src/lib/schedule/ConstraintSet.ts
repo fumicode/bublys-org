@@ -50,7 +50,7 @@ export type ConstraintSetState = {
    * 既定はオフ。これが切り替えるのは優先度だけで、前月とのつなぎ（連勤・遅番明け）は
    * 引き継いでいる限り常に効く。
    *
-   * ドメインでは useContributionPriority と呼ぶが、キーは旧名のまま変えない（勤務表の世界線に載る
+   * ドメインでは useStarPriority と呼ぶが、キーは旧名のまま変えない（勤務表の世界線に載る
    * 保存形なので、名前を変えると同じ中身でもハッシュが変わり、元の世界へ戻れなくなる）。
    */
   useReportPriority?: boolean;
@@ -118,7 +118,7 @@ export class ConstraintSet {
   }
 
   /** 前月の確定版から引き継いだ★を自動シフトの優先度に使うか。既定 false。 */
-  get useContributionPriority(): boolean {
+  get useStarPriority(): boolean {
     return this.state.useReportPriority ?? false;
   }
 
@@ -197,8 +197,8 @@ export class ConstraintSet {
   }
 
   /** 前月の確定版から引き継いだ★を自動シフトの優先度に使うかを変えた新しいセットを返す。不変。 */
-  withUseContributionPriority(use: boolean): ConstraintSet {
-    if (use === this.useContributionPriority) return this;
+  withUseStarPriority(use: boolean): ConstraintSet {
+    if (use === this.useStarPriority) return this;
     return new ConstraintSet({ ...this.state, useReportPriority: use });
   }
 

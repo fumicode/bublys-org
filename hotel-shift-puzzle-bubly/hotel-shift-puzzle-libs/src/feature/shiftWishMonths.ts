@@ -1,85 +1,80 @@
 /**
  * シフト希望の一覧づくり（勤務表・スタッフ・希望 の3つから表示用の行を組む）。
  *
- * 「希望を出す月」は **勤務表がある月**、というルール1つで決まる（＝作成者がシフトを
- * 組もうとしている月。月を別途「募集中」と登録するしくみは作らない）。この導出は
- * 月一覧・月別一覧・スタッフ詳細の3画面で要るので、純粋関数としてここに1箇所だけ置く。
+ * 「希望を出す期」は **勤務表がある期**、というルール1つで決まる（＝作成者がシフトを
+ * 組もうとしている期。期を別途「募集中」と登録するしくみは作らない）。暦月の期も4週の期も同じ。
+ * この導出は期の一覧・期ごとの一覧・スタッフ詳細の3画面で要るので、純粋関数としてここに1箇所だけ置く。
  *
  * 表示語彙（状態・ラベル）は ui/shiftWishStatus が持つ。ここはその語彙で行を組むだけ。
  */
 import {
   StaffMonthlyShiftWish,
   type MonthlyStaffSchedule,
+  type SchedulePeriod,
   type Staff,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import {
   shiftWishStatusOf,
-  type ShiftWishMonthProgress,
-  type ShiftWishMonthSummary,
+  type ShiftWishPeriodProgress,
+  type ShiftWishPeriodSummary,
   type ShiftWishStaffRow,
 } from "../ui/shiftWishStatus.js";
 
-/** 年月（1-12） */
-export type ShiftWishMonth = { year: number; month: number };
-
-/** 勤務表がある年月（重複除去・古い順）。同じ月の勤務表が複数あっても1つに畳む。 */
-export const monthsWithSchedule = (
-  schedules: MonthlyStaffSchedule[]
-): ShiftWishMonth[] => {
-  const seen = new Set<string>();
-  return schedules
-    .map((s) => ({ year: s.year, month: s.month }))
-    .filter(({ year, month }) => {
-      const key = `${year}-${month}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .sort((a, b) => a.year - b.year || a.month - b.month);
+/**
+ * 勤務表がある期（重複除去・古い順）。同じ期の勤務表が複数あっても1つに畳む。
+ * 暦月の期の勤務表も4週の期の勤務表も、その期が希望を出す期になる。
+ */
+export const periodsWithSchedule = (
+  schedules: readonly MonthlyStaffSchedule[]
+): SchedulePeriod[] => {
+  const byKey = new Map<string, SchedulePeriod>();
+  for (const s of schedules) {
+    if (!byKey.has(s.period.key)) byKey.set(s.period.key, s.period);
+  }
+  return [...byKey.values()].sort(
+    (a, b) => a.start.compareTo(b.start) || a.key.localeCompare(b.key)
+  );
 };
 
-/** その月の希望を staffId で引ける Map にする（他の月は混ざらない） */
-export const wishesOfMonth = (
-  wishes: StaffMonthlyShiftWish[],
-  year: number,
-  month: number
+/**
+ * その期の希望を staffId で引ける Map にする（他の期は混ざらない）。
+ * 勤務表が希望を引くのはここ1箇所。希望が受け持つ期（{@link StaffMonthlyShiftWish.period}）と
+ * 勤務表の期が同じものだけを引く。
+ */
+export const wishesOfPeriod = (
+  wishes: readonly StaffMonthlyShiftWish[],
+  period: SchedulePeriod
 ): Map<string, StaffMonthlyShiftWish> =>
-  new Map(
-    wishes
-      .filter((w) => w.year === year && w.month === month)
-      .map((w) => [w.staffId, w])
-  );
+  new Map(wishes.filter((w) => w.period.equals(period)).map((w) => [w.staffId, w]));
 
-/** 月一覧の行：勤務表がある月ごとに、全スタッフぶんの回収の進み具合を数える */
-export const monthProgressList = (
-  schedules: MonthlyStaffSchedule[],
-  wishes: StaffMonthlyShiftWish[],
+/** 期の一覧の行：勤務表がある期ごとに、全スタッフぶんの回収の進み具合を数える */
+export const periodProgressList = (
+  schedules: readonly MonthlyStaffSchedule[],
+  wishes: readonly StaffMonthlyShiftWish[],
   staffCount: number
-): ShiftWishMonthProgress[] =>
-  monthsWithSchedule(schedules).map(({ year, month }) => {
-    const ofMonth = [...wishesOfMonth(wishes, year, month).values()];
-    const statuses = ofMonth.map((w) => shiftWishStatusOf(w));
+): ShiftWishPeriodProgress[] =>
+  periodsWithSchedule(schedules).map((period) => {
+    const ofPeriod = [...wishesOfPeriod(wishes, period).values()];
+    const statuses = ofPeriod.map((w) => shiftWishStatusOf(w));
     return {
-      year,
-      month,
+      period,
       collectedCount: statuses.filter((s) => s === "collected").length,
       startedCount: statuses.filter((s) => s !== "empty").length,
       staffCount,
     };
   });
 
-/** スタッフ詳細の行：その人が、勤務表がある月それぞれでどこまで進んでいるか */
-export const monthSummariesOf = (
-  schedules: MonthlyStaffSchedule[],
-  wishes: StaffMonthlyShiftWish[],
+/** スタッフ詳細の行：その人が、勤務表がある期それぞれでどこまで進んでいるか */
+export const periodSummariesOf = (
+  schedules: readonly MonthlyStaffSchedule[],
+  wishes: readonly StaffMonthlyShiftWish[],
   staffId: string
-): ShiftWishMonthSummary[] => {
+): ShiftWishPeriodSummary[] => {
   const byId = new Map(wishes.map((w) => [w.id, w]));
-  return monthsWithSchedule(schedules).map(({ year, month }) => {
-    const wish = byId.get(StaffMonthlyShiftWish.idOf(staffId, year, month));
+  return periodsWithSchedule(schedules).map((period) => {
+    const wish = byId.get(StaffMonthlyShiftWish.idOf(staffId, period));
     return {
-      year,
-      month,
+      period,
       status: shiftWishStatusOf(wish),
       filledDays: wish?.filledDayCount ?? 0,
       collectedAt: wish?.submittedAt ?? null,
@@ -87,14 +82,13 @@ export const monthSummariesOf = (
   });
 };
 
-/** 月別一覧の行：その月の、スタッフ全員ぶん（希望がまだ無い人も「未入力」で並ぶ） */
+/** 期ごとの一覧の行：その期の、スタッフ全員ぶん（希望がまだ無い人も「未入力」で並ぶ） */
 export const staffWishRows = (
-  staffList: Staff[],
-  wishes: StaffMonthlyShiftWish[],
-  year: number,
-  month: number
+  staffList: readonly Staff[],
+  wishes: readonly StaffMonthlyShiftWish[],
+  period: SchedulePeriod
 ): ShiftWishStaffRow[] => {
-  const byStaff = wishesOfMonth(wishes, year, month);
+  const byStaff = wishesOfPeriod(wishes, period);
   return staffList.map((staff) => {
     const wish = byStaff.get(staff.id);
     return {

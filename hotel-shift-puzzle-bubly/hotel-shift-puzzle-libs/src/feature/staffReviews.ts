@@ -19,11 +19,11 @@ export function staffReviewSummaries(
   return precedingReviews
     .map((report) => ({
       report,
-      score: report.contributions.find((s) => s.staffId === staffId)?.score ?? 0,
+      score: report.stars.find((s) => s.staffId === staffId)?.score ?? 0,
       compromises: report.compromises.filter((c) => c.staffId === staffId),
       busyDays: report.busyDayContributions.filter((d) => d.workedStaffIds.includes(staffId)),
       note: report.noteFor(staffId),
     }))
     .filter((s) => s.score > 0 || s.note.trim().length > 0)
-    .sort((a, b) => b.report.year - a.report.year || b.report.month - a.report.month);
+    .sort((a, b) => b.report.period.start.compareTo(a.report.period.start));
 }

@@ -15,6 +15,7 @@ import {
   ConfirmedSchedule,
   Staff,
   WorkingDay,
+  CalendarMonthPeriod,
 } from '@bublys-org/hotel-shift-puzzle-model';
 import { registerObjects } from '../objects/framework.js';
 import {
@@ -63,23 +64,22 @@ const reportOf = (
   ConfirmedSchedule.create({
     scheduleId,
     worldLineNodeId: nodeId,
-    year: params.year ?? 2026,
-    month: params.month ?? 5,
+    period: CalendarMonthPeriod.of(params.year ?? 2026, params.month ?? 5),
     storeId: params.storeId ?? 'st',
     compromises: [],
     busyDayContributions: [],
-    contributions: [{ staffId: 's1', compromiseCount: 1, busyDayCount: 1, score: 3 }],
+    stars: [{ staffId: 's1', compromiseCount: 1, busyDayCount: 1, score: 3 }],
     confirmedAt: params.confirmedAt,
   });
 
 describe('前月の確定版と、引き継ぎの知らせ', () => {
-  const june = { storeId: 'st', year: 2026, month: 6 };
+  const june = { storeId: 'st', period: CalendarMonthPeriod.of(2026, 6) };
   const tailFrom = (scheduleId: string, nodeId: string, scores?: boolean) =>
     new PrecedingMonthTail({
       source: { scheduleId, worldLineNodeId: nodeId },
       days: [WorkingDay.of(2026, 5, 31)],
       cells: [],
-      ...(scores ? { contributions: [{ staffId: 's1', compromiseCount: 0, busyDayCount: 0, score: 7 }] } : {}),
+      ...(scores ? { stars: [{ staffId: 's1', compromiseCount: 0, busyDayCount: 0, score: 7 }] } : {}),
     });
 
   test('引き継ぐのは、同じ店舗の1か月前の確定版だけ', () => {
@@ -124,7 +124,7 @@ describe('前月の確定版から写し取って、今月の勤務表に焼き�
       saveObject(store, STAFF_TYPE, new Staff({ id, name: id }));
     }
     // 前月（5月）: s1 は 27〜31日の5連勤、末日は遅番
-    let mayS = createSchedule(store, { storeId: 'st', year: 2026, month: 5 });
+    let mayS = createSchedule(store, { storeId: 'st', period: CalendarMonthPeriod.of(2026, 5) });
     mayS = recordScheduleMutation(store, {
       schedule: mayS,
       transform: (s) =>
@@ -157,20 +157,20 @@ describe('前月の確定版から写し取って、今月の勤務表に焼き�
     expect(tail?.shiftNameOn('s1', may(31))).toBe('遅番');
     expect(tail?.trailingWorkdays('s1')).toBe(5);
     expect(tail?.cellOf('s2', may(31))?.value).toEqual({ kind: 'day-off' });
-    expect(tail?.contributionOf('s1')).toBe(3);
+    expect(tail?.starsOf('s1')).toBe(3);
   });
 
   test('引き継ぎ付きで作った今月は、引き継ぎを起点に持ち、前月末からの連勤を持ち越す', async () => {
     const { store, report } = setUp();
     const inheritance = await captureInheritance(store, report, 5);
 
-    const created = createSchedule(store, { storeId: 'st', year: 2026, month: 6, inheritance });
+    const created = createSchedule(store, { storeId: 'st', period: CalendarMonthPeriod.of(2026, 6), inheritance });
     const scope = localScopeId(SCHEDULE_TYPE, created.id);
     const born = readFromScope<MonthlyStaffSchedule>(store, scope, SCHEDULE_TYPE, created.id);
     expect(born?.precedingTail?.source).toEqual(report.version);
     // ★は自動で引き継ぐが、休みの優先度に使うのは既定でオフ
     const constraints = readFromScope<ConstraintSet>(store, scope, CONSTRAINT_SET_TYPE, created.id);
-    expect(constraints?.useContributionPriority).toBe(false);
+    expect(constraints?.useStarPriority).toBe(false);
 
     const june: MonthlyStaffSchedule = created.assignShift('s1', WorkingDay.of(2026, 6, 1), 'middle');
     const violations = new MaxConsecutiveWorkdaysConstraint(5).check(june);

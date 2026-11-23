@@ -1,14 +1,14 @@
 import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 import { WorkingDay } from "./WorkingDay.js";
 import { MinMonthlyDayOffConstraint } from "./MinMonthlyDayOffConstraint.js";
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 describe("MinMonthlyDayOffConstraint", () => {
   it("空の勤務表（全員未定）は違反にしない（まだ達成不可能ではない）", () => {
     const schedule = MonthlyStaffSchedule.create({
       id: "sched-1",
       storeId: "store-1",
-      year: 2026,
-      month: 6, // 30日
+      period: CalendarMonthPeriod.of(2026, 6), // 30日
     });
     const constraints = [new MinMonthlyDayOffConstraint(8)];
     expect(schedule.checkConstraints(constraints)).toEqual([]);
@@ -18,8 +18,7 @@ describe("MinMonthlyDayOffConstraint", () => {
     let schedule = MonthlyStaffSchedule.create({
       id: "sched-1",
       storeId: "store-1",
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
     schedule = schedule.setCell("s1", WorkingDay.of(2026, 6, 1), {
       kind: "work",
@@ -33,8 +32,7 @@ describe("MinMonthlyDayOffConstraint", () => {
     let schedule = MonthlyStaffSchedule.create({
       id: "sched-1",
       storeId: "store-1",
-      year: 2026,
-      month: 6, // 30日
+      period: CalendarMonthPeriod.of(2026, 6), // 30日
     });
     // 1〜25日を出勤済みにする → 残り5日（26〜30）を全部休みにしても5日にしかならず、8日に届かない
     for (let d = 1; d <= 25; d++) {
@@ -54,8 +52,7 @@ describe("MinMonthlyDayOffConstraint", () => {
     let schedule = MonthlyStaffSchedule.create({
       id: "sched-1",
       storeId: "store-1",
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
     for (let d = 1; d <= 8; d++) {
       schedule = schedule.setCell("s1", WorkingDay.of(2026, 6, d), {

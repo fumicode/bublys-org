@@ -5,7 +5,7 @@
  *   勤務表の店舗と年月から決まる（`ConfirmedSchedule.precedingIdFor`）。選ぶことも、紐づけを
  *   持つことも無い。
  * - **引き継いだものは今月の世界に焼き付く。** 写し取るのは確定版の月末の勤務と、振り返りの
- *   貢献度と、どの版から写したか（{@link PrecedingMonthTail}）。前月の確定版を
+ *   ★と、どの版から写したか（{@link PrecedingMonthTail}）。前月の確定版を
  *   後から見に行かない。
  * - **いつ引き継ぐか**：勤務表を作るときに自動で。作った後に前月の確定版が置き換わったり、
  *   前月があとから確定したりしても**勝手には差し替えない**（今月の違反表示や休みの優先順が
@@ -19,9 +19,10 @@ import {
   PrecedingMonthTail,
   ConfirmedSchedule,
   precedingTailLengthFor,
-  type ContributionEntry,
+  type StarEntry,
   type MonthlyStaffSchedule,
   type WorkShiftSet,
+  type SchedulePeriod,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import {
   localScopeId,
@@ -40,10 +41,10 @@ export function confirmedAtOf(store: StoreLike, report: ConfirmedSchedule): numb
   );
 }
 
-/** target の勤務表が引き継ぐ前月の確定版（同じ店舗の1か月前）。まだ確定していなければ undefined（純粋） */
+/** target の勤務表が引き継ぐ前の期の確定版（同じ店舗の、すぐ前の期）。まだ確定していなければ undefined（純粋） */
 export function precedingConfirmedOf(
   reports: readonly ConfirmedSchedule[],
-  target: { storeId: string; year: number; month: number }
+  target: { storeId: string; period: SchedulePeriod }
 ): ConfirmedSchedule | undefined {
   const id = ConfirmedSchedule.precedingIdFor(target);
   return reports.find((r) => r.id === id);
@@ -64,24 +65,24 @@ export function pendingInheritanceOf(
 }
 
 /**
- * 引き継いだ貢献度の行を返す（純粋）。
+ * 引き継いだ★の行を返す（純粋）。
  *
- * 貢献度は引き継ぎに焼き付いているものを読む。貢献度を写す前に引き継いだ古い勤務表（#231 より前）は
+ * ★は引き継ぎに焼き付いているものを読む。★を写す前に引き継いだ古い勤務表（#231 より前）は
  * 焼き付いていないので、引き継いだ版がいまの確定版と同じときだけそこから読む
  * （版が違えば、今月の前提ではないので読まない）。
  */
 export function inheritedScoresOf(
   inherited: PrecedingMonthTail | undefined,
   confirmed: ConfirmedSchedule | undefined
-): readonly ContributionEntry[] | undefined {
+): readonly StarEntry[] | undefined {
   if (!inherited) return undefined;
-  if (inherited.contributions) return inherited.contributions;
-  if (confirmed?.isVersion(inherited.source)) return confirmed.contributions;
+  if (inherited.stars) return inherited.stars;
+  if (confirmed?.isVersion(inherited.source)) return confirmed.stars;
   return undefined;
 }
 
 /**
- * 前月の確定版（確定ノード時点の勤務表）から、引き継ぐもの（月末の勤務と貢献度）を写し取る。
+ * 前月の確定版（確定ノード時点の勤務表）から、引き継ぐもの（月末の勤務と★）を写し取る。
  * 確定した版がもう読めなければ undefined（＝引き継がない。今月1日から数える）。
  *
  * @param maxConsecutiveWorkdays 今月の連勤上限（何日写せば足りるかを決める）
@@ -116,6 +117,6 @@ export async function captureInheritance(
     schedule,
     shiftNameOf: (shiftId) => workShifts?.findById(shiftId)?.name,
     length: precedingTailLengthFor(maxConsecutiveWorkdays),
-    contributions: confirmed.contributions,
+    stars: confirmed.stars,
   });
 }

@@ -1,16 +1,15 @@
-import { ConfirmedSchedule } from '@bublys-org/hotel-shift-puzzle-model';
+import { CalendarMonthPeriod, ConfirmedSchedule } from '@bublys-org/hotel-shift-puzzle-model';
 import { confirmedVersionOf } from './confirmedVersion.js';
 
 const confirmedOf = (scheduleId: string, month: number) =>
   ConfirmedSchedule.confirm({
     scheduleId,
     worldLineNodeId: 'n1',
-    year: 2026,
-    month,
+    period: CalendarMonthPeriod.of(2026, month),
     storeId: 'st',
     compromises: [],
     busyDayContributions: [],
-    contributions: [],
+    stars: [],
   });
 
 describe('confirmedVersionOf（この勤務表が持っている確定版）', () => {
