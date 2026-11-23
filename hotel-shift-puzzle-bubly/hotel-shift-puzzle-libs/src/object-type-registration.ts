@@ -13,7 +13,6 @@ import EventIcon from "@mui/icons-material/Event";
 import GppGoodIcon from "@mui/icons-material/GppGood";
 import PublicIcon from "@mui/icons-material/Public";
 import ParkIcon from "@mui/icons-material/Park";
-import ListAltIcon from "@mui/icons-material/ListAlt";
 import TuneIcon from "@mui/icons-material/Tune";
 import HourglassBottomIcon from "@mui/icons-material/HourglassBottom";
 import EditCalendarIcon from "@mui/icons-material/EditCalendar";
@@ -26,7 +25,6 @@ import {
   SCHEDULE_LEADER_RULE_VIEW_TYPE,
   SCHEDULE_WORLD_LINE_VIEW_TYPE,
   SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE,
-  SCHEDULE_REPORT_LIST_VIEW_TYPE,
   CONSTRAINT_LIMIT_VIEW_TYPE,
   SHIFT_INTERVAL_RULE_VIEW_TYPE,
   SHIFT_WISH_MONTH_VIEW_TYPE,
@@ -50,10 +48,6 @@ registerObjectType(
 registerObjectType(
   SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE,
   React.createElement(ParkIcon, { fontSize: "small" })
-);
-registerObjectType(
-  SCHEDULE_REPORT_LIST_VIEW_TYPE,
-  React.createElement(ListAltIcon, { fontSize: "small" })
 );
 registerObjectType(
   CONSTRAINT_LIMIT_VIEW_TYPE,

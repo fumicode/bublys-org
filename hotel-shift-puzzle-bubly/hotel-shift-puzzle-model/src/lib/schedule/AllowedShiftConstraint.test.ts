@@ -7,6 +7,7 @@ import {
 } from './AllowedShiftConstraint.js';
 import { WorkingStaffGroup } from '../staff/WorkingStaffGroup.js';
 import { WorkingStaffMember } from '../staff/WorkingStaffMember.js';
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 describe('AllowedShiftConstraint（可能勤務帯の外に入れたら違反）', () => {
   const YEAR = 2026;
@@ -17,8 +18,7 @@ describe('AllowedShiftConstraint（可能勤務帯の外に入れたら違反）
     MonthlyStaffSchedule.create({
       id: 'sched-1',
       storeId: 'store-1',
-      year: YEAR,
-      month: MONTH,
+      period: CalendarMonthPeriod.of(YEAR, MONTH),
     });
 
   // limited は遅番しか入れない。free は絞っていない

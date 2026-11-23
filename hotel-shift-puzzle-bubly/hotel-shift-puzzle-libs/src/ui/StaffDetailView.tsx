@@ -2,12 +2,22 @@
 
 import { FC, useState } from "react";
 import styled from "styled-components";
-import { Staff, ScheduleReport, WorkingDay, type CompromiseEntry, type BusyDayEntry, type DayOffStyle } from "../domain/index.js";
+import {
+  Staff,
+  ConfirmedSchedule,
+  EmojiTag,
+  WorkingDay,
+  type CompromiseEntry,
+  type BusyDayEntry,
+  type DayOffStyle,
+  type SchedulePeriod,
+} from "../domain/index.js";
 import { DayOffStyleSelect } from "./DayOffStyleSelect.js";
 import PersonIcon from "@mui/icons-material/Person";
 import EditIcon from "@mui/icons-material/Edit";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
+import AddIcon from "@mui/icons-material/Add";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import HandshakeIcon from "@mui/icons-material/Handshake";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
@@ -17,13 +27,13 @@ import { ShiftWishStatusIcon } from "./ShiftWishStatusIcon.js";
 import {
   collectedAtLabel,
   WISH_STATUS_LABEL,
-  type ShiftWishMonthSummary,
+  type ShiftWishPeriodSummary,
 } from "./shiftWishStatus.js";
 import { STAFF_SHIFT_WISH_SHEET_VIEW_TYPE } from "./viewObjectTypes.js";
 
-/** 参照レポート（紐づけ済みの ScheduleReport）のうち、このスタッフに関する部分だけの読み取り専用サマリ */
-export type StaffLinkedReportSummary = {
-  report: ScheduleReport;
+/** 前月の振り返り（引き継いだ確定版の ConfirmedSchedule）のうち、このスタッフに関する部分だけの読み取り専用サマリ */
+export type StaffReviewSummary = {
+  report: ConfirmedSchedule;
   score: number;
   compromises: CompromiseEntry[];
   busyDays: BusyDayEntry[];
@@ -36,27 +46,52 @@ type StaffDetailViewProps = {
   onChangeDepartment?: (department: string) => void;
   /** 休みの形の既定値を変更する（勤務表ごとの上書きは勤務スタッフ群で） */
   onChangeDayOffStyle?: (style: DayOffStyle) => void;
+  /** 絵文字タグを追加する */
+  onAddTag?: (tag: EmojiTag) => void;
+  /** 絵文字タグを外す */
+  onRemoveTag?: (emoji: string) => void;
   /** 希望を集める月（勤務表がある月）と、この人の回収状況 */
-  shiftWishMonths?: ShiftWishMonthSummary[];
+  shiftWishMonths?: ShiftWishPeriodSummary[];
   /**
    * この人の希望入力表バブルの URL。渡すと「シフト希望」欄が出る。ObjectView に渡すだけで
    * ダブルクリック展開・ドラッグ・data-url は ObjectView が担う（URL スキームは app 層）。
    */
-  shiftWishUrl?: (year: number, month: number) => string;
-  /** このスタッフに関する参照レポートの評価（貢献度スコア・譲歩/繁忙日・配慮メモ）。読み取り専用 */
-  linkedReportSummaries?: StaffLinkedReportSummary[];
+  shiftWishUrl?: (period: SchedulePeriod) => string;
+  /** このスタッフに関する前月の振り返り（★・譲歩/繁忙日・配慮メモ）。読み取り専用 */
+  reviewSummaries?: StaffReviewSummary[];
 };
 
 export const StaffDetailView: FC<StaffDetailViewProps> = ({
   staff,
   onChangeDepartment,
   onChangeDayOffStyle,
+  onAddTag,
+  onRemoveTag,
   shiftWishMonths = [],
   shiftWishUrl,
-  linkedReportSummaries = [],
+  reviewSummaries = [],
 }) => {
   const [editingDept, setEditingDept] = useState(false);
   const [deptValue, setDeptValue] = useState("");
+  const [addingTag, setAddingTag] = useState(false);
+  const [tagEmoji, setTagEmoji] = useState("");
+  const [tagLabel, setTagLabel] = useState("");
+
+  const commitTag = () => {
+    const emoji = tagEmoji.trim();
+    if (emoji && onAddTag) {
+      onAddTag(new EmojiTag({ emoji, label: tagLabel.trim() || undefined }));
+    }
+    setTagEmoji("");
+    setTagLabel("");
+    setAddingTag(false);
+  };
+
+  const cancelTag = () => {
+    setTagEmoji("");
+    setTagLabel("");
+    setAddingTag(false);
+  };
 
   const startEditDept = () => {
     setDeptValue(staff.department);
@@ -105,7 +140,7 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
           <dd>{staff.id}</dd>
           <dt>名前</dt>
           <dd>{staff.name}</dd>
-          <dt>部署</dt>
+          <dt>所属</dt>
           <dd className="e-dept-row">
             {editingDept ? (
               <>
@@ -162,6 +197,79 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
         </dl>
       </section>
 
+      {(onAddTag || staff.tags.length > 0) && (
+        <section className="e-section">
+          <h4>絵文字タグ</h4>
+          <div className="e-tags">
+            {staff.tags.map((tag) => (
+              <span
+                key={tag.emoji}
+                className="e-tag"
+                title={tag.label ?? tag.emoji}
+              >
+                <span className="e-tag-emoji">{tag.emoji}</span>
+                {tag.label && <span className="e-tag-label">{tag.label}</span>}
+                {onRemoveTag && (
+                  <button
+                    className="e-tag-remove"
+                    onClick={() => onRemoveTag(tag.emoji)}
+                    aria-label={`${tag.emoji} を外す`}
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            ))}
+            {onAddTag && !addingTag && (
+              <IconButton
+                size="small"
+                className="e-tag-add-btn"
+                onClick={() => setAddingTag(true)}
+                aria-label="絵文字タグを追加"
+              >
+                <AddIcon fontSize="small" />
+              </IconButton>
+            )}
+          </div>
+          {addingTag && (
+            <div className="e-tag-form">
+              <TextField
+                variant="standard"
+                size="small"
+                autoFocus
+                placeholder="絵文字"
+                value={tagEmoji}
+                onChange={(e) => setTagEmoji(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitTag();
+                  if (e.key === "Escape") cancelTag();
+                }}
+                sx={{ width: 60 }}
+                inputProps={{ style: { fontSize: "1.2em", textAlign: "center" } }}
+              />
+              <TextField
+                variant="standard"
+                size="small"
+                placeholder="ラベル（任意）"
+                value={tagLabel}
+                onChange={(e) => setTagLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitTag();
+                  if (e.key === "Escape") cancelTag();
+                }}
+                sx={{ flex: 1 }}
+              />
+              <IconButton size="small" onClick={commitTag} aria-label="追加">
+                <CheckIcon fontSize="small" sx={{ color: "#2e7d32" }} />
+              </IconButton>
+              <IconButton size="small" onClick={cancelTag} aria-label="キャンセル">
+                <CloseIcon fontSize="small" sx={{ color: "#999" }} />
+              </IconButton>
+            </div>
+          )}
+        </section>
+      )}
+
       {shiftWishUrl && (
         <section className="e-section">
           <h4>シフト希望</h4>
@@ -174,24 +282,24 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
               </li>
             ) : (
               shiftWishMonths.map((m) => (
-                <li key={`${m.year}-${m.month}`}>
+                <li key={m.period.key}>
                   {/* ObjectView: ダブルクリックでその月の入力表 / ドラッグでポケットへ */}
                   <ObjectView
                     type={STAFF_SHIFT_WISH_SHEET_VIEW_TYPE}
-                    url={shiftWishUrl(m.year, m.month)}
-                    label={`${staff.name}のシフト希望（${m.year}年${m.month}月）`}
+                    url={shiftWishUrl(m.period)}
+                    label={`${staff.name}のシフト希望（${m.period.label}）`}
                     openingPosition="bubble-side-right"
                     fullWidth
                   >
                     <span
                       className={`e-wish-month is-${m.status}`}
-                      title={`ダブルクリックで${m.year}年${m.month}月の入力表を開く`}
+                      title={`ダブルクリックで${m.period.label}の入力表を開く`}
                     >
                       <span className="e-status-icon">
                         <ShiftWishStatusIcon status={m.status} />
                       </span>
                       <span className="e-wish-month-label">
-                        {m.year}年{m.month}月
+                        {m.period.label}
                       </span>
                       <span className="e-wish-month-status">
                         {WISH_STATUS_LABEL[m.status]}
@@ -209,11 +317,12 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
         </section>
       )}
 
-      {linkedReportSummaries.length > 0 && (
+      {reviewSummaries.length > 0 && (
         <section className="e-section">
-          <h4>参照レポートでの評価</h4>
+          {/* 振り返りは引き継いだ確定版（勤務表の前の期）のもの。期の呼び方で見出しにする */}
+          <h4>{reviewSummaries[0].report.period.label}の振り返り</h4>
           <ul className="e-linked-reports">
-            {linkedReportSummaries.map(({ report, score, compromises, busyDays, note }) => (
+            {reviewSummaries.map(({ report, score, compromises, busyDays, note }) => (
               <li key={report.id} className="e-linked-report">
                 <div className="e-linked-report-head">
                   <ObjectView
@@ -315,6 +424,13 @@ const StyledStaffDetail = styled.div`
     }
   }
 
+  /* 役割・責任の説明（責任者は勤務表ごとに決めるので、ここでは選ばない） */
+  .e-profile-note {
+    margin: 0 0 4px;
+    font-size: 0.8em;
+    color: #78909c;
+  }
+
   .e-dl {
     display: grid;
     grid-template-columns: auto 1fr;
@@ -340,6 +456,57 @@ const StyledStaffDetail = styled.div`
         color: #3949ab;
       }
     }
+  }
+
+  .e-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .e-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: #f3e5f5;
+    font-size: 0.9em;
+  }
+
+  .e-tag-emoji {
+    font-size: 1.1em;
+  }
+
+  .e-tag-label {
+    font-size: 0.85em;
+    color: #666;
+  }
+
+  .e-tag-remove {
+    all: unset;
+    cursor: pointer;
+    margin-left: 2px;
+    color: #999;
+    font-size: 0.85em;
+    &:hover {
+      color: #d32f2f;
+    }
+  }
+
+  .e-tag-add-btn {
+    color: #9e9e9e;
+    &:hover {
+      color: #1976d2;
+    }
+  }
+
+  .e-tag-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin-top: 8px;
   }
 
   .e-wish-months {

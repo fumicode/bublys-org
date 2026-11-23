@@ -1,7 +1,7 @@
 /**
- * StaffMonthlyShiftWish — スタッフ月別シフト希望
+ * StaffMonthlyShiftWish — スタッフの期ごとのシフト希望
  *
- * あるスタッフの、ある月の勤務希望を表す。「休みたい」「早番がいい」「(この帯は)避けたい」
+ * あるスタッフの、ある期（暦月の期・4週の期）の勤務希望を表す。「休みたい」「早番がいい」「(この帯は)避けたい」
  * 「どうでもいい(空欄)」などを、特別な種類を作らず **統一した形** で記述する:
  *
  *   稼働日 → オプション(キー) → 希望(want=○したい / avoid=×避けたい)
@@ -18,19 +18,25 @@
  * ここで表せる形のうち、実際にどれを入力させるかは上位層（shiftWishOptions）が決める。
  * 現在の入力仕様は「休みは want / 勤務帯は avoid のみ、1日にどちらか一方」。
  *
- * state は完全に plain（入れ子の Record まで素の値）なので、state がそのまま plain を兼ねる。
+ * state は期をインスタンス（SchedulePeriod）で持つ。保存形は暦月の期なら期を入れる前と同じ
+ * year/month で書くので、ホテルの希望の ID・保存形・内容ハッシュは変わらない（{@link periodFieldsOf}）。
  * 不変。更新メソッドは新しいインスタンスを返す。
  */
-import { WorkingDay } from "./WorkingDay.js";
+import type { WorkingDay } from "./WorkingDay.js";
+import {
+  type SchedulePeriod,
+  periodFieldsOf,
+  periodFromFields,
+  type PeriodFields,
+} from "./SchedulePeriod.js";
 
 /** 希望の極性: したい / 避けたい（neutral はキーを持たないことで表す） */
 export type ShiftWishPreference = "want" | "avoid";
 
 export type StaffMonthlyShiftWishState = {
   staffId: string;
-  year: number;
-  /** 1-12 */
-  month: number;
+  /** 希望を出す期（勤務表の期と同じ） */
+  period: SchedulePeriod;
   /** 稼働日キー("2026-06-01") → オプションキー → 希望 */
   byDay: Record<string, Record<string, ShiftWishPreference>>;
   /**
@@ -41,8 +47,9 @@ export type StaffMonthlyShiftWishState = {
   submittedAt: string | null;
 };
 
-/** シリアライズ用（state がそのまま plain） */
-export type StaffMonthlyShiftWishPlain = StaffMonthlyShiftWishState;
+/** シリアライズ用。期は暦月の期なら year/month、それ以外なら period で書く */
+export type StaffMonthlyShiftWishPlain = PeriodFields &
+  Omit<StaffMonthlyShiftWishState, "period">;
 
 const cloneByDay = (
   byDay: Record<string, Record<string, ShiftWishPreference>>
@@ -55,49 +62,40 @@ const cloneByDay = (
 export class StaffMonthlyShiftWish {
   constructor(readonly state: StaffMonthlyShiftWishState) {}
 
-  /** スタッフ×月で一意な ID（"staff-A:2026-06"） */
-  static idOf(staffId: string, year: number, month: number): string {
-    return `${staffId}:${year}-${String(month).padStart(2, "0")}`;
+  /**
+   * スタッフ×期で一意な ID（"staff-A:2026-06" / "staff-A:four-week:2026-06-07"）。
+   * 暦月の期のキーは "2026-06" なので、期を入れる前と同じ ID になる。
+   */
+  static idOf(staffId: string, period: SchedulePeriod): string {
+    return `${staffId}:${period.key}`;
   }
 
   /** 空の希望（全日どうでもいい）を作る */
-  static create(params: {
-    staffId: string;
-    year: number;
-    month: number;
-  }): StaffMonthlyShiftWish {
+  static create(params: { staffId: string; period: SchedulePeriod }): StaffMonthlyShiftWish {
     return new StaffMonthlyShiftWish({
       staffId: params.staffId,
-      year: params.year,
-      month: params.month,
+      period: params.period,
       byDay: {},
       submittedAt: null,
     });
   }
 
   get id(): string {
-    return StaffMonthlyShiftWish.idOf(this.state.staffId, this.state.year, this.state.month);
+    return StaffMonthlyShiftWish.idOf(this.state.staffId, this.state.period);
   }
 
   get staffId(): string {
     return this.state.staffId;
   }
 
-  get year(): number {
-    return this.state.year;
+  /** 希望を出す期。勤務表はこれと自分の期を比べて希望を引く */
+  get period(): SchedulePeriod {
+    return this.state.period;
   }
 
-  /** 1-12 */
-  get month(): number {
-    return this.state.month;
-  }
-
-  /** その月の全稼働日（1日〜末日） */
+  /** その期の全稼働日 */
   workingDays(): WorkingDay[] {
-    const lastDay = new Date(this.state.year, this.state.month, 0).getDate();
-    return Array.from({ length: lastDay }, (_, i) =>
-      WorkingDay.of(this.state.year, this.state.month, i + 1)
-    );
+    return this.period.days();
   }
 
   /** その稼働日・そのオプションの希望（neutral は undefined） */
@@ -176,8 +174,8 @@ export class StaffMonthlyShiftWish {
   toPlain(): StaffMonthlyShiftWishPlain {
     return {
       staffId: this.state.staffId,
-      year: this.state.year,
-      month: this.state.month,
+      // 暦月の期は期を入れる前と同じ year/month で書く（ID・保存形・内容ハッシュを変えない）
+      ...periodFieldsOf(this.state.period),
       byDay: cloneByDay(this.state.byDay),
       submittedAt: this.state.submittedAt,
     };
@@ -186,8 +184,7 @@ export class StaffMonthlyShiftWish {
   static fromPlain(plain: StaffMonthlyShiftWishPlain): StaffMonthlyShiftWish {
     return new StaffMonthlyShiftWish({
       staffId: plain.staffId,
-      year: plain.year,
-      month: plain.month,
+      period: periodFromFields(plain),
       byDay: cloneByDay(plain.byDay ?? {}),
       // 確定のしくみより前に保存されたデータは未確定として読む
       submittedAt: plain.submittedAt ?? null,

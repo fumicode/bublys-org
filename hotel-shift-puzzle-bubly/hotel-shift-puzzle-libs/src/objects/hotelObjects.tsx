@@ -15,6 +15,7 @@ import GroupsIcon from "@mui/icons-material/Groups";
 import RuleIcon from "@mui/icons-material/Rule";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AssessmentIcon from "@mui/icons-material/Assessment";
+import StorefrontIcon from "@mui/icons-material/Storefront";
 import {
   Staff,
   type StaffPlain,
@@ -25,9 +26,13 @@ import {
   MonthlyStaffSchedule,
   DailyReservationInfo,
   StaffMonthlyShiftWish,
+  type StaffMonthlyShiftWishPlain,
   ConstraintSet,
   type ConstraintSetPlain,
-  ScheduleReport,
+  ConfirmedSchedule,
+  type ConfirmedSchedulePlain,
+  Store,
+  type StorePlain,
   type MonthlyStaffSchedulePlain,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { objectShape, primitiveShape } from "@bublys-org/domain-registry";
@@ -36,6 +41,8 @@ import { AppWorld } from "./world.js";
 import { localScopeId } from "./commit.js";
 
 /** オブジェクト型名 */
+/** 店舗（勤務表の外のデータ。勤務表を作るときに読むだけ） */
+export const STORE_TYPE = "Store";
 export const STAFF_TYPE = "Staff";
 /** 勤務表ごとの「働く人たち」。勤務表が workingStaffGroupId で指す（id=scheduleId） */
 export const WORKING_STAFF_GROUP_TYPE = "WorkingStaffGroup";
@@ -55,11 +62,27 @@ export const CONSTRAINT_SET_TYPE = "ConstraintSet";
 /** グローバルの制約セット（テンプレート）の固定ID。勤務表作成時にこれをコピーする。 */
 export const GLOBAL_CONSTRAINT_SET_ID = "global";
 
-export const SCHEDULE_REPORT_TYPE = "ScheduleReport";
+/**
+ * 確定版（店舗×月で1つ。#231）。型名は保存されている世界線の参照に載っているので、
+ * クラスを ConfirmedSchedule に改めたあとも旧名 "ScheduleReport" のまま変えない。
+ */
+export const CONFIRMED_SCHEDULE_TYPE = "ScheduleReport";
 
 // 注: バブル URL（開く URL のスキーム）は app 層の関心事なので、ここ（libs）では持たない。
 // オブジェクトの正規 URL は app の registration/bubbleUrls.ts が registerObjectUrl で登録する。
 export const HOTEL_OBJECTS = defineObjects({
+  Store: {
+    class: Store,
+    getId: (s: Store) => s.id,
+    icon: React.createElement(StorefrontIcon, { fontSize: "small" }),
+    // 勤務表の外のデータ。世界に属さない（external、既定）。店舗の設定は勤務表を作るときに
+    // 読むだけで、できた勤務表は自分の期を持つので、時間移動で店舗が戻る必要は無い。
+    // 形態・期の決め方をインスタンスで持つので codec を明示する。
+    serialize: {
+      toJSON: (s: Store) => s.toPlain(),
+      fromJSON: (j) => Store.fromPlain(j as StorePlain),
+    },
+  },
   Staff: {
     class: Staff,
     getId: (s: Staff) => s.id,
@@ -146,14 +169,19 @@ export const HOTEL_OBJECTS = defineObjects({
     // 稼働日ごとの予約状況（宿泊人数・部屋数）は「実際の予約」という外部の実データ。
     // シフト作成の試行錯誤（勤務表の世界線）とは別物なので、世界に属さない（external、既定）。
     // 勤務表の世界の中から読んでも常にグローバルを見るので、時間移動しても予約状況は
-    // 変わらない（ScheduleReport と同じ考え方）。
+    // 変わらない（ConfirmedSchedule と同じ考え方）。
     // state が完全 plain（scheduleId ＋ byDay マップ）なので serialize 不要。
   },
   StaffMonthlyShiftWish: {
     class: StaffMonthlyShiftWish,
     getId: (w: StaffMonthlyShiftWish) => w.id,
-    // スタッフ×月で1つ。店舗・勤務表には依存しないので世界に属さない（external、既定）。
-    // state が完全 plain なので state-object 規約で plain 化（serialize 不要）。
+    // スタッフ×期で1つ。店舗・勤務表には依存しないので世界に属さない（external、既定）。
+    // 期をインスタンスで持つので codec を明示する（暦月の期は前と同じ year/month で書くので、
+    // 保存済みの希望と形・ハッシュが変わらない）。
+    serialize: {
+      toJSON: (w: StaffMonthlyShiftWish) => w.toPlain(),
+      fromJSON: (j) => StaffMonthlyShiftWish.fromPlain(j as StaffMonthlyShiftWishPlain),
+    },
   },
   ConstraintSet: {
     class: ConstraintSet,
@@ -174,13 +202,18 @@ export const HOTEL_OBJECTS = defineObjects({
         id === GLOBAL_CONSTRAINT_SET_ID ? undefined : localScopeId(SCHEDULE_TYPE, id),
     },
   },
+  // 保存上の型名は旧名のまま（CONFIRMED_SCHEDULE_TYPE を参照）
   ScheduleReport: {
-    class: ScheduleReport,
-    getId: (r: ScheduleReport) => r.state.id,
+    class: ConfirmedSchedule,
+    getId: (r: ConfirmedSchedule) => r.state.id,
     icon: React.createElement(AssessmentIcon, { fontSize: "small" }),
     // 確定時点のスナップショット。世界に属さない（external、既定）。
     // 勤務表の世界に相乗りさせると、時間移動のたびに現れたり消えたりして確定記録の
-    // 意味が壊れる。state が完全 plain → serialize 不要。
+    // 意味が壊れる。保存形は旧形式の名前（contributionScores）も読めるよう codec を明示する。
+    serialize: {
+      toJSON: (r: ConfirmedSchedule) => r.toPlain(),
+      fromJSON: (j) => ConfirmedSchedule.fromPlain(j as ConfirmedSchedulePlain),
+    },
   },
 });
 

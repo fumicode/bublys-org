@@ -3,7 +3,7 @@
 /**
  * limitSpecs — 「数と真偽で言い切れる制約」1つぶんの記述を1枚にまとめたテーブル。
  *
- * 連勤上限・月の最低休日・1日の休み上限・可能勤務帯チェック・希望チェック・参照レポートの優先度は、どれも
+ * 連勤上限・月の最低休日・1日の休み上限・可能勤務帯チェック・希望チェック・★の優先度は、どれも
  * 「制約セットから1つ読んで、1つ書き戻す」だけの制約。個別のコンポーネントも
  * 個別のハンドラも要らないので、**違うのはこの表の1行だけ**にしてある。
  *
@@ -20,7 +20,7 @@ import { MinMonthlyDayOffIcon } from "./MinMonthlyDayOffIcon.js";
 import { MaxConsecutiveIcon } from "./MaxConsecutiveIcon.js";
 import { AllowedShiftIcon } from "./AllowedShiftIcon.js";
 import { WishIcon } from "./WishIcon.js";
-import { ReportPriorityIcon } from "./ReportPriorityIcon.js";
+import { StarPriorityIcon } from "./StarPriorityIcon.js";
 
 /** バーの3群。稼働日ごと（縦↕）／人ごと（横↔）／全体 */
 export type LimitGroup = "per-day" | "per-person" | "whole";
@@ -35,7 +35,10 @@ export type LimitSpec = {
   group: LimitGroup;
   /** 数で決まるか、入/切で決まるか */
   kind: "number" | "boolean";
-  /** 入力欄のラベルと単位（数のときだけ使う） */
+  /**
+   * 数の前後の言葉（数のときだけ使う）。バブルでは「label N unit」を1文として出す
+   * （例: 連勤は最大 [5] 日まで）。入/切のときは label が入/切の説明
+   */
   label: string;
   unit?: string;
   /** 制約セットから現在の値を読む */
@@ -44,8 +47,15 @@ export type LimitSpec = {
   apply: (set: ConstraintSet, value: number | boolean) => ConstraintSet;
   /** いまの値を1行の日本語にする（ツールチップと図の説明） */
   describe: (value: number | boolean) => string;
-  /** その値の図を描く */
-  render: (value: number | boolean, size?: number) => ReactNode;
+  /**
+   * その値の図を描く。onCommit を渡すと、図の中の数を押してその場で変えられる
+   * （バブルの大きい図だけが渡す。バーの小さいアイコンは読むだけ）。
+   */
+  render: (
+    value: number | boolean,
+    size?: number,
+    onCommit?: (value: number) => void
+  ) => ReactNode;
 };
 
 const asNumber = (v: number | boolean): number => (typeof v === "number" ? v : 0);
@@ -66,7 +76,9 @@ export const LIMIT_SPECS: LimitSpec[] = [
     read: (set) => set.maxDayOffPerDay,
     apply: (set, v) => set.withMaxDayOffPerDay(asNumber(v)),
     describe: (v) => `1日に休めるのは${asNumber(v)}人まで`,
-    render: (v, size) => <MaxDayOffPerDayIcon max={asNumber(v)} size={size} />,
+    render: (v, size, onCommit) => (
+      <MaxDayOffPerDayIcon max={asNumber(v)} size={size} onCommit={onCommit} />
+    ),
   },
   {
     key: "min-monthly-day-off",
@@ -78,7 +90,9 @@ export const LIMIT_SPECS: LimitSpec[] = [
     read: (set) => set.minMonthlyDayOff,
     apply: (set, v) => set.withMinMonthlyDayOff(asNumber(v)),
     describe: (v) => `月に${asNumber(v)}日以上休む`,
-    render: (v, size) => <MinMonthlyDayOffIcon min={asNumber(v)} size={size} />,
+    render: (v, size, onCommit) => (
+      <MinMonthlyDayOffIcon min={asNumber(v)} size={size} onCommit={onCommit} />
+    ),
   },
   {
     key: "max-consecutive-workdays",
@@ -90,7 +104,9 @@ export const LIMIT_SPECS: LimitSpec[] = [
     read: (set) => set.maxConsecutiveWorkdays,
     apply: (set, v) => set.withMaxConsecutiveWorkdays(asNumber(v)),
     describe: (v) => `連勤は最大${asNumber(v)}日まで`,
-    render: (v, size) => <MaxConsecutiveIcon max={asNumber(v)} size={size} />,
+    render: (v, size, onCommit) => (
+      <MaxConsecutiveIcon max={asNumber(v)} size={size} onCommit={onCommit} />
+    ),
   },
   {
     key: "check-allowed-shift",
@@ -125,14 +141,16 @@ export const LIMIT_SPECS: LimitSpec[] = [
     caption: "★優先",
     group: "whole",
     kind: "boolean",
-    label: "参照レポートの貢献度で休みを優先する",
-    read: (set) => set.useReportPriority,
-    apply: (set, v) => set.withUseReportPriority(asBoolean(v)),
+    // 制約セットはグローバルのテンプレートとしても使い、期を持たない。だから「前月」「前の期」の
+    // どちらにも寄せず、どちらにも通じる言い方にする（期の言葉は期の種類が決める）
+    label: "引き継いだ★で休みを優先する",
+    read: (set) => set.useStarPriority,
+    apply: (set, v) => set.withUseStarPriority(asBoolean(v)),
     describe: (v) =>
       asBoolean(v)
-        ? "参照レポートの貢献度（★）が高い人ほど、自動シフトで休みを優先して取れる"
-        : "参照レポートの貢献度は休みの優先度に使わない",
-    render: (v, size) => <ReportPriorityIcon on={asBoolean(v)} size={size} />,
+        ? "前の確定版から引き継いだ★が高い人ほど、自動シフトで休みを優先して取れる"
+        : "前の確定版から引き継いだ★は休みの優先度に使わない",
+    render: (v, size) => <StarPriorityIcon on={asBoolean(v)} size={size} />,
   },
 ];
 

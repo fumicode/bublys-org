@@ -13,6 +13,7 @@ import { makeResolveAmbiguousLeaderSlotsStep } from './resolveAmbiguousLeaderSlo
 import { makeMinDayOffStep } from './minDayOffStep.js';
 import type { AutoShiftContext, AutoShiftStep, DecodedWish } from './autoShiftStep.js';
 import type { ScheduleConstraint } from './ScheduleConstraint.js';
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 /**
  * 自動シフトの全ステップが、勤務表の制約リストを守る（#161）。
@@ -32,8 +33,7 @@ describe('自動シフトは勤務表の制約を守る', () => {
     MonthlyStaffSchedule.create({
       id: 'sched-1',
       storeId: 'store-1',
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
       requiredStaffing: required,
     });
 

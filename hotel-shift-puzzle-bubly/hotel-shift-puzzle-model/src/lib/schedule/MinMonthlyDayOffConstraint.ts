@@ -31,6 +31,8 @@ export class MinMonthlyDayOffConstraint implements ScheduleConstraint {
   check(schedule: MonthlyStaffSchedule): ConstraintViolation[] {
     const violations: ConstraintViolation[] = [];
     const days = schedule.workingDays();
+    // 数える範囲は勤務表の期（暦月なら「月」、4週なら「期」と呼ぶ）
+    const unit = schedule.period.words.unit;
     const staffIds = [...new Set(schedule.assignments.map((a) => a.staffId))];
     for (const staffId of staffIds) {
       const off = days.filter(
@@ -45,9 +47,9 @@ export class MinMonthlyDayOffConstraint implements ScheduleConstraint {
           new ConstraintViolation({
             constraintType: this.type,
             staffId,
-            days: [], // 月単位（特定日ではない）
-            message: `休みが月${off}日（最低${this.minDays}日必要、残り${undecided}日では届きません）`,
-            summary: `月の休みが最低${this.minDays}日に届かない`,
+            days: [], // 期単位（特定日ではない）
+            message: `休みが${unit}${off}日（最低${this.minDays}日必要、残り${undecided}日では届きません）`,
+            summary: `${unit}の休みが最低${this.minDays}日に届かない`,
           })
         );
       }

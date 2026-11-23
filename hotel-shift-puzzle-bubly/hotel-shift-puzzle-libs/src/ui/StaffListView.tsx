@@ -2,7 +2,8 @@
 
 import { FC, useState } from "react";
 import styled from "styled-components";
-import { Staff } from "../domain/index.js";
+import { Staff, type StaffProfile } from "../domain/index.js";
+import { ProfileMarkGroups, profileMarkStyles } from "./ProfileMarks.js";
 import PersonIcon from "@mui/icons-material/Person";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
@@ -19,6 +20,11 @@ type StaffListViewProps = {
   onRename?: (id: string, name: string) => void;
   /** スタッフを削除する */
   onRemove?: (id: string) => void;
+  /**
+   * その人のスタッフプロファイル（店舗での既定値。#236）。名前の横の記号（🔰・休みの形…）を
+   * 勤務表と同じ部品で出す。責任者は勤務表ごとに決めるので、名簿には出ない
+   */
+  profileOf?: (staffId: string) => StaffProfile;
 };
 
 export const StaffListView: FC<StaffListViewProps> = ({
@@ -26,6 +32,7 @@ export const StaffListView: FC<StaffListViewProps> = ({
   onCreate,
   onRename,
   onRemove,
+  profileOf,
 }) => {
   const [name, setName] = useState("");
   const [department, setDepartment] = useState("");
@@ -108,7 +115,10 @@ export const StaffListView: FC<StaffListViewProps> = ({
                   <div className="e-content">
                     <PersonIcon fontSize="small" className="e-avatar" />
                     <div className="e-info">
-                      <div className="e-name">{staff.name}</div>
+                      <div className="e-name-row">
+                        <span className="e-name">{staff.name}</span>
+                        {profileOf && <ProfileMarkGroups profile={profileOf(staff.id)} />}
+                      </div>
                       {staff.department && (
                         <div className="e-dept">{staff.department}</div>
                       )}
@@ -249,12 +259,20 @@ const StyledStaffList = styled.ul`
       min-width: 0;
     }
 
+    /* 名前と、その横の記号（スタッフプロファイル） */
+    .e-name-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+    }
     .e-name {
       font-weight: bold;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    ${profileMarkStyles}
 
     .e-dept {
       font-size: 0.78em;

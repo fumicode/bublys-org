@@ -1,5 +1,7 @@
 /**
  * **空で開かない。** 世界に何も無いときだけ、例データを入れてから見せる。
+ * 入れる例データはデプロイの形態で決まる（`sampleItemsFor`）。例データを持たない形態の
+ * デプロイ（いまは行政版）は空で始まる。
  *
  * ★ **空のデモは「何も無いページ」に見える。** 初めて来た人は、まず何かが写っていないと
  *   触りようがない ── 作るところから始めさせない（前は `勤務表がありません` で止まっていた）。
@@ -15,9 +17,10 @@
 import { useEffect, useRef } from "react";
 import { useAppStore } from "@bublys-org/state-management";
 import { APP_SCOPE_ID, commitBundle, bornWorldsOf, isScopeEmpty } from "../objects/commit.js";
-import { buildSampleItems } from "../objects/seed.js";
+import type { StoreFormat } from "@bublys-org/hotel-shift-puzzle-model";
+import { sampleItemsFor } from "../objects/seed.js";
 
-export function useSampleWhenEmpty(): void {
+export function useSampleWhenEmpty(formats: readonly StoreFormat[]): void {
   const store = useAppStore();
   /** 入れるのは 1 回だけ（入れた直後は自分の書き込みで走り直すので、旗で止める） */
   const settled = useRef(false);
@@ -26,9 +29,10 @@ export function useSampleWhenEmpty(): void {
     if (settled.current) return;
     settled.current = true;
     if (!isScopeEmpty(store, APP_SCOPE_ID)) return;   // 人の世界がある ── 触らない
-    const items = buildSampleItems();
+    const items = sampleItemsFor(formats);
+    if (!items) return;                               // この形態には例データが無い ── 空で始める
     commitBundle(store, APP_SCOPE_ID, items);
     // 勤務表それぞれに世界を持たせる（`useWorldFile` の例データ読み込みと同じ手順）
     bornWorldsOf(store, items);
-  }, [store]);
+  }, [store, formats]);
 }

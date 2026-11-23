@@ -2,6 +2,7 @@ import {
   ConstraintSet,
   StaffMonthlyShiftWish,
   WorkingDay,
+  CalendarMonthPeriod,
 } from '@bublys-org/hotel-shift-puzzle-model';
 import { autoShiftLimitsOf, decodeWishForStaff } from './autoShift.js';
 import { DAY_OFF_WISH, toggleWishInput, workWishKey } from '../ui/shiftWishOptions.js';
@@ -14,7 +15,7 @@ describe('decodeWishForStaff（×で候補を絞る）', () => {
     ['遅番', 'late'],
   ]);
   const empty = () =>
-    StaffMonthlyShiftWish.create({ staffId: 'staff-A', year: 2026, month: 6 });
+    StaffMonthlyShiftWish.create({ staffId: 'staff-A', period: CalendarMonthPeriod.of(2026, 6) });
   const OPTION_KEYS = [
     DAY_OFF_WISH,
     workWishKey('早番'),

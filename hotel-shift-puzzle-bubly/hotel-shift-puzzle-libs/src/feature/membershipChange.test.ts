@@ -11,6 +11,7 @@ import {
   ShiftLeaderRule,
   WorkingDay,
   Staff,
+  CalendarMonthPeriod,
 } from '@bublys-org/hotel-shift-puzzle-model';
 import { buildMembershipChange } from './membershipChange.js';
 import {
@@ -26,8 +27,7 @@ const setUp = () => ({
   schedule: MonthlyStaffSchedule.create({
     id: 'sched-1',
     storeId: 'store-1',
-    year: 2026,
-    month: 6,
+    period: CalendarMonthPeriod.of(2026, 6),
   })
     .assignShift('a', june1, 'early')
     .assignShift('b', june1, 'late'),

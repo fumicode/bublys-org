@@ -42,17 +42,20 @@ export class WorkingDay {
   /**
    * 一意キー・ISO日付 "2026-06-01"（辞書順でソート可能）
    * 索引や比較で多用されるので、不変であることを利用して初回だけ組み立てる。
+   *
+   * 覚え書きは `#`（本当の非公開フィールド）に置く。普通のフィールドだと、`.key` を読んだ日と
+   * 読んでいない日が、同じ日なのに深い比較（テストの toMatchObject / toEqual）で別物になる。
    */
-  private cachedKey?: string;
+  #cachedKey?: string;
 
   get key(): string {
-    if (this.cachedKey === undefined) {
+    if (this.#cachedKey === undefined) {
       const yyyy = String(this.state.year).padStart(4, "0");
       const mm = String(this.state.month).padStart(2, "0");
       const dd = String(this.state.day).padStart(2, "0");
-      this.cachedKey = `${yyyy}-${mm}-${dd}`;
+      this.#cachedKey = `${yyyy}-${mm}-${dd}`;
     }
-    return this.cachedKey;
+    return this.#cachedKey;
   }
 
   /** "6/1" のような短い表示 */
@@ -68,6 +71,19 @@ export class WorkingDay {
   /** カレンダー演算用のローカル Date を返す */
   toDate(): Date {
     return new Date(this.state.year, this.state.month - 1, this.state.day);
+  }
+
+  /** n 日後（負なら前）の日。月・年をまたいでも暦どおりに進む */
+  addDays(n: number): WorkingDay {
+    const d = new Date(this.state.year, this.state.month - 1, this.state.day + n);
+    return WorkingDay.of(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  }
+
+  /** other から何日後か（other より前なら負） */
+  daysSince(other: WorkingDay): number {
+    // 時刻を UTC の正午に揃えて割る（現地時刻の夏時間で1時間ずれても日数が狂わない）
+    const utc = (w: WorkingDay) => Date.UTC(w.year, w.month - 1, w.day, 12);
+    return Math.round((utc(this) - utc(other)) / 86_400_000);
   }
 
   equals(other: WorkingDay): boolean {

@@ -1,6 +1,7 @@
 import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 import { WorkingDay } from "./WorkingDay.js";
 import { RequiredStaffingConstraint } from "./RequiredStaffingConstraint.js";
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 describe("RequiredStaffingConstraint", () => {
   const june1 = WorkingDay.of(2026, 6, 1);
@@ -14,8 +15,7 @@ describe("RequiredStaffingConstraint", () => {
     MonthlyStaffSchedule.create({
       id: "sched-1",
       storeId: "store-1",
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
 
   it("必要人数が未設定の日は違反にしない", () => {

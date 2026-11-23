@@ -1,6 +1,7 @@
 import { MonthlyStaffSchedule } from './MonthlyStaffSchedule.js';
 import { WorkingDay } from './WorkingDay.js';
 import { ShiftLeaderRule } from './ShiftLeaderRule.js';
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 describe('ShiftLeaderRule（責任者の宣言的ルール ＝ ORルール）', () => {
   const june1 = WorkingDay.of(2026, 6, 1);
@@ -9,8 +10,7 @@ describe('ShiftLeaderRule（責任者の宣言的ルール ＝ ORルール）', 
     MonthlyStaffSchedule.create({
       id: 'sched-1',
       storeId: 'store-1',
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
 
   // 早責: A・B のうち1人が早番に入っていればよい

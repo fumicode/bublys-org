@@ -11,6 +11,7 @@ import {
 import { AllowedShiftConstraint, ALLOWED_SHIFT_CONSTRAINT } from "./AllowedShiftConstraint.js";
 import { WorkingStaffGroup } from "../staff/WorkingStaffGroup.js";
 import { WorkingStaffMember } from "../staff/WorkingStaffMember.js";
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 describe("legalCandidatesFor", () => {
   const early = WorkShift.of("early", "早番", { hour: 7 });
@@ -19,8 +20,7 @@ describe("legalCandidatesFor", () => {
     const schedule = MonthlyStaffSchedule.create({
       id: "sched-1",
       storeId: "store-1",
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
     const day1 = WorkingDay.of(2026, 6, 1);
     const candidates = legalCandidatesFor(schedule, [], "s1", day1, [early]);
@@ -31,8 +31,7 @@ describe("legalCandidatesFor", () => {
     const schedule = MonthlyStaffSchedule.create({
       id: "sched-1",
       storeId: "store-1",
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
     const day1 = WorkingDay.of(2026, 6, 1);
     const candidates = legalCandidatesFor(schedule, [], "s1", day1, [early]);
@@ -46,8 +45,7 @@ describe("legalCandidatesFor", () => {
     let schedule = MonthlyStaffSchedule.create({
       id: "sched-1",
       storeId: "store-1",
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
     for (let d = 1; d <= 5; d++) {
       schedule = schedule.setCell("s1", WorkingDay.of(2026, 6, d), {
@@ -66,8 +64,7 @@ describe("legalCandidatesFor", () => {
     let schedule = MonthlyStaffSchedule.create({
       id: "sched-1",
       storeId: "store-1",
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
     // s1: 1〜5日を出勤済み → 6日目に出勤すると連勤違反
     for (let d = 1; d <= 5; d++) {
@@ -94,7 +91,7 @@ describe("legalCandidatesFor", () => {
 describe("violationsIntroducedBy（各値に替えたら新しく出る違反）", () => {
   const day = (d: number) => WorkingDay.of(2026, 6, d);
   const empty = () =>
-    MonthlyStaffSchedule.create({ id: "sched-1", storeId: "store-1", year: 2026, month: 6 });
+    MonthlyStaffSchedule.create({ id: "sched-1", storeId: "store-1", period: CalendarMonthPeriod.of(2026, 6) });
   // s1 は遅番しか入れない
   const allowed = new AllowedShiftConstraint(
     new WorkingStaffGroup({
@@ -152,8 +149,7 @@ describe("previewCellValues（各値を入れたときのセルの姿）", () =>
     const s = MonthlyStaffSchedule.create({
       id: "sched-1",
       storeId: "store-1",
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     }).setCell("s1", day(1), { kind: "work", shiftId: "early" });
     const [middle, late] = previewCellValues(s, [allowed], "s1", day(1), [
       { kind: "work", shiftId: "middle" },
