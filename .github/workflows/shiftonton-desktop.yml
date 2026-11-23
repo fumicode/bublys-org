@@ -7,18 +7,12 @@ name: シフトントン デスクトップ版（Windows）
 
 on:
   workflow_dispatch:
-  # ★ 一時的: #238 の PR だけ、マージ前に Windows で試せるようにインストーラーを作る。
-  #   手で実行するボタンは main に入るまで出ないため。マージ前にこの 2 行と、下の if を消す。
-  pull_request:
-    paths: ["hotel-shift-puzzle-bubly/hotel-shift-puzzle-electron/**", ".github/workflows/shiftonton-desktop.yml"]
 
 permissions:
   contents: read
 
 jobs:
   build-windows:
-    # 消し忘れても、ほかの PR では走らない
-    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'kanetaku1/issue238'
     runs-on: windows-latest
     timeout-minutes: 60
     env:
