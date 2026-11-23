@@ -46,3 +46,17 @@ nsis:
   deleteAppDataOnUninstall: false
   shortcutName: シフトントン
   artifactName: shiftonton-setup-${version}.${ext}
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - universal
+  artifactName: shiftonton-${version}-${arch}.${ext}
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  artifactName: shiftonton-${version}-${arch}.${ext}

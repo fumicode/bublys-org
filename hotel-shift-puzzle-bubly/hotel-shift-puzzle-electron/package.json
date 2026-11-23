@@ -9,6 +9,8 @@
   "scripts": {
     "start": "electron .",
     "package:win": "electron-builder --win --x64 --publish never",
+    "package:mac": "electron-builder --mac --publish never",
+    "package:linux": "electron-builder --linux --x64 --publish never",
     "package:dir": "electron-builder --dir --publish never"
   },
   "devDependencies": {
@@ -29,6 +31,28 @@
         ]
       },
       "package:win": {
+        "dependsOn": [
+          "build",
+          {
+            "projects": [
+              "@bublys-org/hotel-shift-puzzle-app"
+            ],
+            "target": "build"
+          }
+        ]
+      },
+      "package:mac": {
+        "dependsOn": [
+          "build",
+          {
+            "projects": [
+              "@bublys-org/hotel-shift-puzzle-app"
+            ],
+            "target": "build"
+          }
+        ]
+      },
+      "package:linux": {
         "dependsOn": [
           "build",
           {
