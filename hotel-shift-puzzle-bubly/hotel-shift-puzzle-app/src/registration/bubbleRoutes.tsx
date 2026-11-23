@@ -200,7 +200,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
         scheduleViolationUrl(scheduleId, violationKey)
       }
       reservationInfoUrl={scheduleReservationInfoUrl(scheduleId)}
-      shiftExcelUrl={shiftExcelUrl(scheduleId)}
+      shiftExcelUrl={availableStoreFormats.some(f => f.id === "government") ? shiftExcelUrl(scheduleId) : undefined}
       createCandidatesWorker={createCandidatesWorker}
       reviewUrl={rvUrl}
       onOpenReview={() => openSide(rvUrl, "bubble-side-right")}
