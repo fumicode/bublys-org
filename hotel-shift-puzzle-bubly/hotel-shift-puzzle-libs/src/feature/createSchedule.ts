@@ -14,9 +14,9 @@
  * 起点に勤務帯セットも可能勤務帯も固定メンバーも載らない（そこへ時間移動しても戻らない）。
  * 誕生は1回・1ノード、が守るべきルール。
  *
- * 参照レポート（前月の確定）を渡されたら、それを紐づけ、その確定版の末尾
- * （{@link PrecedingMonthTail}）を持って生まれる。参照も末尾も起点ノードに一緒に載る。
- * 確定版を探して読むのは非同期なので、呼び出し側（precedingMonth.ts）が先に済ませる。
+ * 前月の確定版から引き継ぐもの（{@link PrecedingMonthTail}：月末の勤務と★）を渡されたら、
+ * それを持って生まれる（起点ノードに載る）。確定版を読むのは非同期なので、呼び出し側が
+ * 先に済ませる（precedingMonth.ts の captureInheritance）。
  */
 import {
   MonthlyStaffSchedule,
@@ -43,7 +43,6 @@ import {
   GLOBAL_WORKSHIFT_SET_ID,
   GLOBAL_CONSTRAINT_SET_ID,
 } from "../objects/hotelObjects.js";
-import { withReference } from "./precedingMonth.js";
 
 type StoreLike = {
   getState: () => {
@@ -65,15 +64,19 @@ export function createSchedule(
     storeId: string;
     year: number;
     month: number;
-    /** 参照レポート（前月の確定）と、その確定版から写し取った末尾。前月の確定が無ければ省略 */
-    reference?: { reportId: string; tail?: PrecedingMonthTail };
+    /**
+     * 前月の確定版から引き継ぐもの（月末の勤務と★。precedingMonth.ts の captureInheritance）。
+     * 前月が確定していない・確定版が読めなければ省略（今月1日から数える）
+     */
+    inheritance?: PrecedingMonthTail;
   }
 ): MonthlyStaffSchedule {
   const id = newScheduleId();
   const scopeId = localScopeId(SCHEDULE_TYPE, id);
 
-  const { reference, ...where } = params;
-  const blank = MonthlyStaffSchedule.create({ id, ...where });
+  const { inheritance, ...where } = params;
+  // 引き継ぎは生まれたときから持つ（起点のノードに載る）
+  const schedule = MonthlyStaffSchedule.create({ id, ...where }).withPrecedingTail(inheritance);
 
   // グローバルの勤務帯セットをこの勤務表用のコピーにする（id を差し替えた別オブジェクト）。
   // 未投入なら既定セットへフォールバック。
@@ -87,20 +90,13 @@ export function createSchedule(
 
   // 制約セットも同じ形でコピーする。グローバルで整えた責任者ルール・上限が、
   // 新しい勤務表の出発点になる。未投入なら既定値だけの空セット。
-  const adoptedConstraints =
+  const constraintSet =
     adoptGlobalValue<ConstraintSet>(
       store,
       CONSTRAINT_SET_TYPE,
-      (global) => global.withId(blank.constraintSetId),
+      (global) => global.withId(schedule.constraintSetId),
       GLOBAL_CONSTRAINT_SET_ID
-    ) ?? ConstraintSet.empty(blank.constraintSetId);
-
-  // 参照レポートと前月の末尾は一緒に付く（precedingMonth.ts の withReference）
-  const { schedule, constraints: constraintSet } = withReference(
-    blank,
-    adoptedConstraints,
-    reference
-  );
+    ) ?? ConstraintSet.empty(schedule.constraintSetId);
 
   // 固定メンバー。**参照**だけを見るので、値が CAS から追い出されていても取りこぼさない。
   // 勤務スタッフ群はこの参照の id から作る（値を読まないのが要点）。

@@ -8,7 +8,7 @@ import type {
   WorkingDay,
   ConstraintViolation,
   ShiftCell,
-  ScheduleReport,
+  ContributionEntry,
   PrecedingMonthTail,
   StaffProfile,
 } from "../../domain/index.js";
@@ -61,8 +61,8 @@ type StaffScheduleRowProps = {
   profile?: StaffProfile;
   /** 責任者の記号をクリックしたときに、そのルールの関係者を選択させるコールバック */
   onSelectRule?: (staffIds: string[]) => void;
-  /** 参照レポート。この人にスコアがあれば名前の横に出す（自動シフトで休みを優先する順） */
-  referenceReport?: ScheduleReport;
+  /** 前月の確定版から引き継いだ★。この人にスコアがあれば名前の横に出す（自動シフトで休みを優先する順） */
+  inheritedScores?: readonly ContributionEntry[];
   /** 名前から開くバブルの URL。省略時はスタッフの正規 URL */
   staffUrl?: string;
   /** 選択モード中で、この行が選択対象（強調＝少し浮かせる） */
@@ -115,7 +115,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   onToggleSelected,
   profile,
   onSelectRule,
-  referenceReport,
+  inheritedScores,
   staffUrl,
   focused,
   dimmed,
@@ -139,7 +139,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
     selected && maxConsecutive !== undefined
       ? runMarksOf(schedule, staff.id, days, maxConsecutive, dayOffTarget)
       : [];
-  const priority = referenceReport?.contributionScores.find((s) => s.staffId === staff.id);
+  const priority = inheritedScores?.find((s) => s.staffId === staff.id);
   return (
     <>
       {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開（bubble-side-left）/ ドラッグ。
@@ -178,10 +178,11 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             <span className="e-staff-name">{staff.name}</span>
             <span className="e-staff-badges">
               {profile && <ProfileMarkGroups profile={profile} onSelectRule={onSelectRule} />}
-              {referenceReport && priority && priority.score > 0 && (
+              {priority && priority.score > 0 && (
                 <span
                   className="e-priority-badge"
-                  title={`参照レポート「${referenceReport.title}」の貢献度スコア ${priority.score}（譲歩${priority.compromiseCount}件・繁忙日${priority.busyDayCount}日）。高い人ほど自動シフトで休みを優先して取れます`}
+                  aria-label={`星${priority.score}`}
+                  title={`前月の確定版から引き継いだ★${priority.score}（譲歩${priority.compromiseCount}件・繁忙日${priority.busyDayCount}日）。高い人ほど自動シフトで休みを優先して取れます`}
                 >
                   ★{priority.score}
                 </span>

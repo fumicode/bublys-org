@@ -80,7 +80,8 @@ describe("runMarksOf — 連勤・連休の線の置き場所", () => {
         if (c === "O") may = may.assignDayOff("s1", d);
       });
       return PrecedingMonthTail.capture({
-        sourceReportId: "may:1",
+        source: { scheduleId: "may", worldLineNodeId: "n" },
+        contributions: [],
         schedule: may,
         shiftNameOf: () => "早番",
         length: row.length,

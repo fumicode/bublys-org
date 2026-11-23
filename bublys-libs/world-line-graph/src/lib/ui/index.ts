@@ -30,3 +30,4 @@ export {
   type InspectorScopeRow,
 } from "./WorldLineInspectorView.js";
 export * from "./world-line-3d/index.js";
+export * from "./milestoneMark.js";
