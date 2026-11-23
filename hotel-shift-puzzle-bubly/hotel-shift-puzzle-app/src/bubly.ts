@@ -10,7 +10,10 @@ import { registerBubly, Bubly, BublyMenuItem } from "@bublys-org/bubbles-ui";
 import GridOnIcon from '@mui/icons-material/GridOn';
 
 // Bubble Routes
-import { hotelShiftPuzzleBubbleRoutes, shiftWishListUrl } from "./registration/index.js";
+import {
+  hotelShiftPuzzleBubbleRoutes,
+  shiftWishListUrl,
+} from "./registration/index.js";
 
 import PeopleIcon from "@mui/icons-material/People";
 import ScheduleIcon from "@mui/icons-material/Schedule";

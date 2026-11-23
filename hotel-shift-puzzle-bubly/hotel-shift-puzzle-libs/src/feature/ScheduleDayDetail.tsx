@@ -25,6 +25,7 @@ import {
 } from "../objects/hotelObjects.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
 import { useWorkingStaff } from "./workingStaff.js";
+import { staffProfileResolver } from "./staffProfile.js";
 
 type ScheduleDayDetailProps = {
   scheduleId?: string;
@@ -88,6 +89,17 @@ const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({
     createWorker: createCandidatesWorker,
   });
 
+  // 名前の横の記号（スタッフプロファイル）。勤務表グリッドと同じ引き方で読む
+  const profileOf = useMemo(
+    () =>
+      staffProfileResolver({
+        staffList,
+        staffGroup,
+        leaderRules,
+      }),
+    [staffList, staffGroup, leaderRules]
+  );
+
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
@@ -126,6 +138,7 @@ const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({
         staffList={staffList}
         workShifts={shiftOptions}
         leaderRules={leaderRules}
+        profileOf={profileOf}
         wishByStaff={wishByStaff}
         // 再計算中は前回の（古いかもしれない）候補を出さない（グリッドと同じ扱い）
         candidates={computing ? undefined : candidates}
