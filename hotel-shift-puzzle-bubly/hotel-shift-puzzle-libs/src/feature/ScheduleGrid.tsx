@@ -74,7 +74,6 @@ import {
   pendingInheritanceOf,
   precedingConfirmedOf,
 } from "./precedingMonth.js";
-import { ConfirmedReview } from "./ConfirmedReview.js";
 import { versionLabelFor } from "./versionLabel.js";
 import { useConfirmedVersion } from "./confirmedVersion.js";
 import { useScheduleHistory } from "./useScheduleHistory.js";
@@ -300,10 +299,6 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   const [importingInheritance, setImportingInheritance] = useState(false);
   // この勤務表が持っている確定版（あれば振り返りを出す）と、その版のノードの名前
   const confirmedVersion = useConfirmedVersion(scheduleId);
-  const confirmedNodeLabel = confirmedVersion
-    ? scope.graph.state.nodes[confirmedVersion.worldLineNodeId]?.label
-    : undefined;
-  const [reviewOpen, setReviewOpen] = useState(false);
   // 確定版の読み出しは非同期なので、記録するときは待っている間の編集を含む最新の値へ載せる
   const latestRef = useRef({ schedule, constraints });
   latestRef.current = { schedule, constraints };
@@ -760,7 +755,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       (r) => r.id === ConfirmedSchedule.idFor(schedule.storeId, schedule.period)
     );
     if (currentConfirmed?.isVersion({ scheduleId, worldLineNodeId: apex.id })) {
-      setReviewOpen(true);
+      onOpenReview?.();
       return;
     }
 
@@ -807,7 +802,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       scope.setNodeLabel(apex.id, versionLabelFor(new Date(confirmedAt), labels));
     }
 
-    setReviewOpen(true);
+    onOpenReview?.();
   };
 
   // 行＝勤務スタッフ群のメンバーなので、その並びの続きに導線を置く（ヘッダには出さない）
@@ -879,18 +874,33 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     </>
   );
 
-  const confirmButton = (
-    <button
-      type="button"
-      className="e-confirm"
-      onClick={() => void handleConfirm()}
-      title={
-        `いま見ている版を、この${schedule.period.words.unit}の確定版にします（すでに確定版があれば置き換わります）。` +
-        `${schedule.period.words.next}の勤務表は、確定版から引き継いで始まります`
-      }
-    >
-      🏁 確定する
-    </button>
+  const confirmArea = (
+    <div className="e-confirm-area">
+      <button
+        type="button"
+        className="e-confirm"
+        onClick={() => void handleConfirm()}
+        title={
+          `いま見ている版を、この${schedule.period.words.unit}の確定版にします（すでに確定版があれば置き換わります）。` +
+          `${schedule.period.words.next}の勤務表は、確定版から引き継いで始まります`
+        }
+      >
+        🏁 確定する
+      </button>
+      {confirmedVersion && reviewUrl && (
+        <ObjectView
+          type={CONFIRMED_SCHEDULE_TYPE}
+          id={confirmedVersion.id}
+          url={reviewUrl}
+          label={`${schedule.period.label}の振り返り`}
+          openingPosition="bubble-side-left"
+        >
+          <span className="e-review-opener" title="ダブルクリックで振り返りを開く">
+            振り返り
+          </span>
+        </ObjectView>
+      )}
+    </div>
   );
 
   return (
@@ -952,9 +962,10 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
             wrapSource={(node) =>
               inherited && precedingReviewUrl ? (
                 <ObjectView
-                  type={SCHEDULE_TYPE}
-                  id={inherited.source.scheduleId}
-                  label={`${schedule.period.previous().label}の勤務表`}
+                  type={CONFIRMED_SCHEDULE_TYPE}
+                  id={precedingConfirmed?.id ?? inherited.source.scheduleId}
+                  url={precedingReviewUrl(inherited.source.scheduleId)}
+                  label={`${schedule.period.previous().label}の振り返り`}
                   openingPosition="origin-side"
                   draggable={false}
                 >
@@ -968,7 +979,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         </div>
         )}
         {/* 右上：確定する＋振り返り */}
-        {confirmButton}
+        {confirmArea}
       </div>
 
       {/* 左: 適用中の制約を動的アイコンで描く（稼働日ごと↕ / 人ごと↔ / 全体）
@@ -1128,22 +1139,6 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           )}
       </div>
 
-      {/* この勤務表が確定版を持っていれば、その振り返り（独立したバブルは持たない。#231）。
-          確定した直後は開いて出す。前月の勤務表を開いたときも、ここで振り返りが見られる */}
-      {confirmedVersion && (
-        <details
-          className="e-review"
-          open={reviewOpen}
-          onToggle={(e) => setReviewOpen(e.currentTarget.open)}
-        >
-          <summary>
-            🏁 {confirmedVersion.period.label}の確定版
-            {confirmedNodeLabel && <span className="e-review-version">（{confirmedNodeLabel}）</span>}
-            の振り返り
-          </summary>
-          <ConfirmedReview report={confirmedVersion} editable />
-        </details>
-      )}
     </StyledContainer>
   );
 };
@@ -1387,7 +1382,7 @@ const StyledContainer = styled.div<HTMLAttributes<HTMLDivElement> & { ref?: Ref<
   }
 
 
-  /* 左下：世界線ビュー・キセキの木・確定する。
+  /* 左下：世界線ビュー・キセキの木。
      バブルの中身がスクロールしても、バブルの下端に貼り付いて見えている
      （以前は表の下にあり、開いた直後はバブルの中を下までスクロールしないと見えなかった） */
   .e-footer {
