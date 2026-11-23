@@ -214,9 +214,6 @@ const ExtractedScheduleBubble: BubbleRoute["Component"] = ({ bubble }) =>
     <ExtractedSchedule
       scheduleId={bubble.params.scheduleId}
       staffIds={(bubble.params.staffIds ?? "").split(",").filter(Boolean)}
-      staffBubbleUrl={(staffId) =>
-        scheduleStaffDetailUrl(bubble.params.scheduleId, staffId)
-      }
     />
   );
 

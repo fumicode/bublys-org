@@ -197,7 +197,8 @@ export class WorkingStaffGroup {
     );
   }
 
-  private memberOf(staffId: string): WorkingStaffMember | undefined {
+  /** その人のメンバー（この勤務表で働かない人は undefined） */
+  memberOf(staffId: string): WorkingStaffMember | undefined {
     return this.state.members.find((m) => m.staffId === staffId);
   }
 
