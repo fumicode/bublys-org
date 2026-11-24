@@ -277,7 +277,7 @@ export function exportShiftFromTemplate(
   zip["xl/worksheets/sheet1.xml"] = new TextEncoder().encode(modifiedXml);
 
   const result = zipSync(zip);
-  return result.buffer;
+  return result.buffer as ArrayBuffer;
 }
 
 /**
