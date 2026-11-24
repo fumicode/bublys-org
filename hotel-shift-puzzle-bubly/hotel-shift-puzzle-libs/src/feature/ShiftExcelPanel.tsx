@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useCallback, useMemo, useState } from "react";
+import { FC, useCallback, useMemo, useRef, useState } from "react";
 import {
   WorkingDay,
   MonthlyStaffSchedule,
@@ -23,7 +23,11 @@ import {
 import { ShiftExcelView } from "../ui/ShiftExcelView.js";
 import { importShiftFromExcel } from "./shiftExcelImport.js";
 import { downloadShiftExcel } from "./shiftExcelExport.js";
+import { downloadShiftFromTemplate } from "./shiftTemplateExport.js";
+import { saveTemplate, loadTemplate } from "./shiftTemplateStorage.js";
+import { rokuyoNoteOf } from "./rokuyoNote.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
+import { useStore } from "./useStore.js";
 import { recordMembershipEdit } from "./recordScheduleEdit.js";
 import {
   SCHEDULE_TYPE,
@@ -50,6 +54,8 @@ const ShiftExcelPanelInner: FC<{
   const staffGroup = useObject<WorkingStaffGroup>(WORKING_STAFF_GROUP_TYPE, scheduleId);
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
+  const resolvedStore = useStore(schedule?.storeId);
+  const isGovernment = resolvedStore?.format.id === "government";
 
   const staffList = useMemo(
     () => (staffGroup ? staffGroup.resolve(roster) : roster),
@@ -61,6 +67,8 @@ const ShiftExcelPanelInner: FC<{
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "info" | "warn" | "error"; text: string } | null>(null);
   const [importSummary, setImportSummary] = useState<string | null>(null);
+  const [templateUpdatePrompt, setTemplateUpdatePrompt] = useState(false);
+  const pendingTemplateBuffer = useRef<ArrayBuffer | null>(null);
 
   const handleImport = useCallback(async (file: File) => {
     if (!schedule) return;
@@ -180,6 +188,11 @@ const ShiftExcelPanelInner: FC<{
         ? "期間が異なるため、スタッフのみ読み込みました。"
         : "読み込み完了。希望をストアに保存しました。";
       setMessage({ kind: periodMismatch ? "warn" : "info", text: msgText });
+
+      if (isGovernment) {
+        pendingTemplateBuffer.current = buffer;
+        setTemplateUpdatePrompt(true);
+      }
     } catch (e) {
       setMessage({
         kind: "error",
@@ -188,7 +201,21 @@ const ShiftExcelPanelInner: FC<{
     } finally {
       setBusy(false);
     }
-  }, [store, schedule, scheduleId, staffGroup, staffList, wishRepo]);
+  }, [store, schedule, scheduleId, staffGroup, staffList, wishRepo, isGovernment]);
+
+  const handleConfirmTemplateUpdate = useCallback(() => {
+    if (pendingTemplateBuffer.current) {
+      saveTemplate("government", pendingTemplateBuffer.current);
+      setMessage({ kind: "info", text: "テンプレートを保存しました。" });
+    }
+    pendingTemplateBuffer.current = null;
+    setTemplateUpdatePrompt(false);
+  }, []);
+
+  const handleSkipTemplateUpdate = useCallback(() => {
+    pendingTemplateBuffer.current = null;
+    setTemplateUpdatePrompt(false);
+  }, []);
 
   const handleExport = useCallback(() => {
     if (!schedule) return;
@@ -250,16 +277,75 @@ const ShiftExcelPanelInner: FC<{
     }
   }, [schedule, staffList, allWishes, workShiftSet]);
 
+  const handleTemplateExport = useCallback(() => {
+    if (!schedule) return;
+    setBusy(true);
+    setMessage(null);
+
+    try {
+      const days = schedule.workingDays();
+
+      const staffRows: StaffRow[] = staffList.map((s: Staff, i: number) => ({
+        rowNumber: i + 1,
+        subNumber: undefined,
+        name: s.name,
+        staffId: s.id,
+      }));
+
+      const formatInput: FormatInput = {
+        title: `${schedule.state.period.label}　シフト`,
+        period: schedule.state.period,
+        days,
+        staffRows,
+        shiftValueOf: (staffId: string, dayKey: string) => {
+          const day = days.find((d: { key: string }) => d.key === dayKey);
+          if (!day) return null;
+          const a = schedule.getAssignment(staffId, day);
+          return a?.shift ?? null;
+        },
+        dayOffReasonOf: (staffId: string, dayKey: string) => {
+          const day = days.find((d: { key: string }) => d.key === dayKey);
+          if (!day) return undefined;
+          return schedule.getAssignment(staffId, day)?.dayOffReason;
+        },
+        shiftNameOf: (shiftId: string) =>
+          workShiftSet?.shifts.find((s) => s.id === shiftId)?.name,
+      };
+
+      const storedTemplate = loadTemplate("government");
+      downloadShiftFromTemplate(formatInput, {
+        rokuyoOf: (day) => {
+          const note = rokuyoNoteOf(day);
+          return note ? { label: note.label } : undefined;
+        },
+        templateData: storedTemplate,
+      });
+      setMessage({ kind: "info", text: "集計付きテンプレートExcelをダウンロードしました。" });
+    } catch (e) {
+      setMessage({
+        kind: "error",
+        text: `テンプレートエクスポートに失敗しました: ${e instanceof Error ? e.message : String(e)}`,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }, [schedule, staffList, workShiftSet]);
+
   return (
     <ShiftExcelView
       canImport={true}
       canExport={!!schedule}
+      canTemplateExport={isGovernment}
       busy={busy}
       message={message}
       importSummary={importSummary}
+      templateUpdatePrompt={templateUpdatePrompt}
       onImport={(file) => void handleImport(file)}
       onExport={handleExport}
+      onTemplateExport={handleTemplateExport}
       onDismissMessage={() => { setMessage(null); setImportSummary(null); }}
+      onConfirmTemplateUpdate={handleConfirmTemplateUpdate}
+      onSkipTemplateUpdate={handleSkipTemplateUpdate}
     />
   );
 };
