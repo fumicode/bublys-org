@@ -60,6 +60,7 @@ function buildSampleImportData(): GovernmentShiftImportData {
       },
     ],
     legendSections: [],
+    holidayCount: undefined,
   };
 }
 

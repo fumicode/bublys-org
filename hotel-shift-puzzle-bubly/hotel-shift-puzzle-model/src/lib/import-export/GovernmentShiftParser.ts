@@ -47,6 +47,8 @@ export type GovernmentShiftImportData = {
   staffEntries: StaffEntry[];
   /** 凡例（正規職員 / 会計年度任用）。テンプレートに凡例があれば2セクション */
   legendSections: LegendSection[];
+  /** 月間休暇日数（AI4セルの値）。休日制約の入り口 */
+  holidayCount: number | undefined;
 };
 
 // ========== 全角→半角変換 ==========
@@ -130,7 +132,7 @@ export function parseGovernmentShift(
   grid: string[][],
 ): GovernmentShiftImportData {
   if (grid.length === 0) {
-    return { period: undefined, title: "", days: [], staffEntries: [], legendSections: [] };
+    return { period: undefined, title: "", days: [], staffEntries: [], legendSections: [], holidayCount: undefined };
   }
 
   // --- タイトルを探す ---
@@ -160,7 +162,7 @@ export function parseGovernmentShift(
   }
 
   if (dayRowIndex === -1) {
-    return { period: undefined, title, days: [], staffEntries: [], legendSections: [] };
+    return { period: undefined, title, days: [], staffEntries: [], legendSections: [], holidayCount: undefined };
   }
 
   // --- 日付列のマッピング（列インデックス → WorkingDay） ---
@@ -211,7 +213,15 @@ export function parseGovernmentShift(
   // --- 凡例をパース ---
   const legendSections = parseLegendSections(grid);
 
-  return { period, title, days, staffEntries, legendSections };
+  // --- 月間休暇日数（AI4）をパース ---
+  const holidayCountRaw = dayRowIndex >= 0
+    ? grid[dayRowIndex]?.[HOLIDAY_COUNT_COL]?.trim()
+    : undefined;
+  const holidayCount = holidayCountRaw && /^\d+$/.test(holidayCountRaw)
+    ? Number(holidayCountRaw)
+    : undefined;
+
+  return { period, title, days, staffEntries, legendSections, holidayCount };
 }
 
 // ========== 内部ヘルパー ==========
@@ -290,6 +300,9 @@ function parseStaffRow(
 }
 
 // ========== 凡例パース ==========
+
+/** AI列（col 34）の月間休暇日数 */
+const HOLIDAY_COUNT_COL = 34;
 
 /** AW列（col 48）の凡例ヘッダー */
 const LEGEND_HEADER = "時間帯";

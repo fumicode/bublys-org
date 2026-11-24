@@ -28,7 +28,6 @@ const WEEKDAY_ROW = 4;
 const DATA_START_ROW = 5;
 
 const REIWA_COL = 1;
-const YEAR_COL = 2;
 const MONTH_COL = 3;
 const DAY_START_COL = 4;
 const DAY_COUNT = 28;
@@ -148,12 +147,8 @@ function buildModifications(
     value: input.title,
   });
 
-  // 令和・年数・月表記（B4, C4, D4）
+  // 令和・月表記（B4, D4）— C4（令和年数）はテンプレートが持つので触らない
   mods.set(cellRef(DAY_ROW, REIWA_COL), { type: "string", value: "R" });
-  mods.set(cellRef(DAY_ROW, YEAR_COL), {
-    type: "number",
-    value: days[0].year - 2018,
-  });
   const startMonth = days[0].month;
   const endMonth = days[days.length - 1].month;
   mods.set(cellRef(DAY_ROW, MONTH_COL), {

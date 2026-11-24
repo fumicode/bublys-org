@@ -130,9 +130,8 @@ describe("テンプレートExcelエクスポート（B案）", () => {
     const input = buildTestInput();
     const sheet = readSheet(exportShiftFromTemplate(input));
 
-    // B4 = "R", C4 = 令和年数, D4 = 月
+    // B4 = "R", D4 = 月（C4 = 令和年数はテンプレートが持つので触らない）
     expect(cellVal(sheet, 3, 1)).toBe("R");
-    expect(cellVal(sheet, 3, 2)).toBe("8");
     // 11月1日 = E4 (col 4)
     expect(cellVal(sheet, 3, 4)).toBe("1");
     // 曜日: 2026-11-01 は日曜日

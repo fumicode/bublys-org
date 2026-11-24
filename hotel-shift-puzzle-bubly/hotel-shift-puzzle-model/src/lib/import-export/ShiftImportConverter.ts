@@ -63,6 +63,8 @@ export type ShiftImportResult = {
   staffResults: StaffImportResult[];
   /** テンプレートの凡例セクション（正規職員 / 会計年度任用） */
   legendSections: LegendSection[];
+  /** 月間休暇日数（AI4セルの値）。休日制約の入り口 */
+  holidayCount: number | undefined;
 };
 
 // ========== 変換関数 ==========
@@ -89,6 +91,7 @@ export function convertImportData(
     days: data.days,
     staffResults,
     legendSections: data.legendSections,
+    holidayCount: data.holidayCount,
   };
 }
 
