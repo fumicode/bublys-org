@@ -41,6 +41,8 @@ export type WorkingStaffMemberState = {
   allowedShiftIds?: string[];
   /** この勤務表での休みの形の上書き。省略＝その人の既定値のまま */
   dayOffStyle?: DayOffStyle;
+  /** 会計年度任用のサブ番号（行政版テンプレートのC列）。省略＝サブ番号なし */
+  subNumber?: number;
 };
 
 /** シリアライズ用：入れ子まで全部 plain */
@@ -49,6 +51,7 @@ export type WorkingStaffMemberPlain = {
   staff?: StaffPlain;
   allowedShiftIds?: string[];
   dayOffStyle?: DayOffStylePlain;
+  subNumber?: number;
 };
 
 export class WorkingStaffMember {
@@ -147,6 +150,17 @@ export class WorkingStaffMember {
     return new WorkingStaffMember({ ...this.state, dayOffStyle: style });
   }
 
+  // ========== サブ番号 ==========
+
+  get subNumber(): number | undefined {
+    return this.state.subNumber;
+  }
+
+  withSubNumber(subNumber: number | undefined): WorkingStaffMember {
+    if (this.state.subNumber === subNumber) return this;
+    return new WorkingStaffMember({ ...this.state, subNumber });
+  }
+
   get staffId(): string {
     return this.state.staffId;
   }
@@ -194,6 +208,7 @@ export class WorkingStaffMember {
       plain.allowedShiftIds = [...this.state.allowedShiftIds];
     }
     if (this.state.dayOffStyle) plain.dayOffStyle = this.state.dayOffStyle.toPlain();
+    if (this.state.subNumber !== undefined) plain.subNumber = this.state.subNumber;
     return plain;
   }
 
@@ -205,6 +220,7 @@ export class WorkingStaffMember {
         ? [...plain.allowedShiftIds]
         : undefined,
       dayOffStyle: plain.dayOffStyle ? DayOffStyle.fromPlain(plain.dayOffStyle) : undefined,
+      subNumber: plain.subNumber,
     });
   }
 }

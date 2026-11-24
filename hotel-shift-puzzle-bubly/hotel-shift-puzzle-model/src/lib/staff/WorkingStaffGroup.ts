@@ -202,6 +202,16 @@ export class WorkingStaffGroup {
     return this.state.members.find((m) => m.staffId === staffId);
   }
 
+  setSubNumber(staffId: string, subNumber: number | undefined): WorkingStaffGroup {
+    return this.mapMember(staffId, (m) => m.withSubNumber(subNumber));
+  }
+
+  setAllowedShifts(staffId: string, shiftIds: string[]): WorkingStaffGroup {
+    return this.mapMember(staffId, (m) =>
+      new WorkingStaffMember({ ...m.state, allowedShiftIds: [...shiftIds] }),
+    );
+  }
+
   private withMember(
     staffId: string,
     member: WorkingStaffMember

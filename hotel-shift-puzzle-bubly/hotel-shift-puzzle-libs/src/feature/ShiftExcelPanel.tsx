@@ -8,6 +8,8 @@ import {
   StaffMonthlyShiftWish,
   WorkingStaffGroup,
   WorkShiftSet,
+  GOVERNMENT_SYMBOL_MAPPING,
+  legendToShiftIds,
   type ShiftWishPreference,
   type ShiftCell,
   type StaffRow,
@@ -95,8 +97,10 @@ const ShiftExcelPanelInner: FC<{
       const unmatchedResults = converted.staffResults
         .filter((s) => !staffByName.has(s.name));
 
-      if (unmatchedResults.length > 0 && staffGroup) {
+      if (staffGroup) {
         let updatedGroup = staffGroup;
+
+        // 未登録スタッフを臨時メンバーとして追加
         for (const result of unmatchedResults) {
           const staffId = `imported-${result.name}`;
           if (!updatedGroup.has(staffId)) {
@@ -104,11 +108,44 @@ const ShiftExcelPanelInner: FC<{
             updatedGroup = updatedGroup.addTemporary(tempStaff);
           }
         }
+
+        // サブ番号を反映
+        for (const result of converted.staffResults) {
+          const staffId = staffByName.get(result.name) ?? `imported-${result.name}`;
+          if (updatedGroup.has(staffId)) {
+            updatedGroup = updatedGroup.setSubNumber(staffId, result.subNumber);
+          }
+        }
+
+        // 凡例から可能勤務帯を反映（2セクション: 正規職員 / 会計年度任用）
+        if (converted.legendSections.length >= 2 && workShiftSet) {
+          const regularShiftIds = legendToShiftIds(
+            converted.legendSections[0], GOVERNMENT_SYMBOL_MAPPING, workShiftSet,
+          );
+          const fiscalShiftIds = legendToShiftIds(
+            converted.legendSections[1], GOVERNMENT_SYMBOL_MAPPING, workShiftSet,
+          );
+          if (regularShiftIds.length > 0 || fiscalShiftIds.length > 0) {
+            for (const result of converted.staffResults) {
+              const staffId = staffByName.get(result.name) ?? `imported-${result.name}`;
+              if (!updatedGroup.has(staffId)) continue;
+              const ids = result.subNumber !== undefined ? fiscalShiftIds : regularShiftIds;
+              if (ids.length > 0) {
+                updatedGroup = updatedGroup.setAllowedShifts(staffId, ids);
+              }
+            }
+          }
+        }
+
+        const changed: { type: string; obj: unknown }[] = [];
         if (updatedGroup !== staffGroup) {
+          changed.push({ type: WORKING_STAFF_GROUP_TYPE, obj: updatedGroup });
+        }
+        if (changed.length > 0) {
           recordMembershipEdit(store, {
             scheduleId,
             schedule,
-            changed: [{ type: WORKING_STAFF_GROUP_TYPE, obj: updatedGroup }],
+            changed,
           });
         }
       }
@@ -201,7 +238,7 @@ const ShiftExcelPanelInner: FC<{
     } finally {
       setBusy(false);
     }
-  }, [store, schedule, scheduleId, staffGroup, staffList, wishRepo, isGovernment]);
+  }, [store, schedule, scheduleId, staffGroup, staffList, wishRepo, isGovernment, workShiftSet]);
 
   const handleConfirmTemplateUpdate = useCallback(() => {
     if (pendingTemplateBuffer.current) {
@@ -234,7 +271,7 @@ const ShiftExcelPanelInner: FC<{
 
       const staffRows: StaffRow[] = staffList.map((s: Staff, i: number) => ({
         rowNumber: i + 1,
-        subNumber: undefined,
+        subNumber: staffGroup?.memberOf(s.id)?.subNumber,
         name: s.name,
         staffId: s.id,
       }));
@@ -287,7 +324,7 @@ const ShiftExcelPanelInner: FC<{
 
       const staffRows: StaffRow[] = staffList.map((s: Staff, i: number) => ({
         rowNumber: i + 1,
-        subNumber: undefined,
+        subNumber: staffGroup?.memberOf(s.id)?.subNumber,
         name: s.name,
         staffId: s.id,
       }));
@@ -329,7 +366,7 @@ const ShiftExcelPanelInner: FC<{
     } finally {
       setBusy(false);
     }
-  }, [schedule, staffList, workShiftSet]);
+  }, [schedule, staffList, staffGroup, workShiftSet]);
 
   return (
     <ShiftExcelView
