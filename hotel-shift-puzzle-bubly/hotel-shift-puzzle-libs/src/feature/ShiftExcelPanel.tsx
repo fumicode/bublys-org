@@ -10,6 +10,7 @@ import {
   WorkShiftSet,
   GOVERNMENT_SYMBOL_MAPPING,
   legendToShiftIds,
+  toWareki,
   type ShiftWishPreference,
   type ShiftCell,
   type StaffRow,
@@ -340,6 +341,7 @@ const ShiftExcelPanelInner: FC<{
 
     try {
       const days = schedule.workingDays();
+      const dayMap = new Map(days.map((d: WorkingDay) => [d.key, d]));
 
       const staffRows: StaffRow[] = staffList.map((s: Staff, i: number) => ({
         rowNumber: i + 1,
@@ -348,19 +350,26 @@ const ShiftExcelPanelInner: FC<{
         staffId: s.id,
       }));
 
+      const storeName = resolvedStore?.name ?? "シフト";
+      const startDay = days[0];
+      const endDay = days[days.length - 1];
+      const title = startDay && endDay
+        ? `${toWareki(startDay)}～${toWareki(endDay)}　${storeName}シフト`
+        : `${schedule.state.period.label}　${storeName}シフト`;
+
       const formatInput: FormatInput = {
-        title: `${schedule.state.period.label}　シフト`,
+        title,
         period: schedule.state.period,
         days,
         staffRows,
         shiftValueOf: (staffId: string, dayKey: string) => {
-          const day = days.find((d: { key: string }) => d.key === dayKey);
+          const day = dayMap.get(dayKey);
           if (!day) return null;
           const a = schedule.getAssignment(staffId, day);
           return a?.shift ?? null;
         },
         dayOffReasonOf: (staffId: string, dayKey: string) => {
-          const day = days.find((d: { key: string }) => d.key === dayKey);
+          const day = dayMap.get(dayKey);
           if (!day) return undefined;
           return schedule.getAssignment(staffId, day)?.dayOffReason;
         },
@@ -385,7 +394,7 @@ const ShiftExcelPanelInner: FC<{
     } finally {
       setBusy(false);
     }
-  }, [schedule, staffList, staffGroup, workShiftSet]);
+  }, [schedule, staffList, staffGroup, workShiftSet, resolvedStore]);
 
   return (
     <ShiftExcelView
