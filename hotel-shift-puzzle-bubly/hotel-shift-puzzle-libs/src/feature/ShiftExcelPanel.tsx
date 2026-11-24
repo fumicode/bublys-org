@@ -137,9 +137,28 @@ const ShiftExcelPanelInner: FC<{
           }
         }
 
+        // 凡例にない勤務帯を WorkShiftSet から削除
+        let updatedShiftSet = workShiftSet;
+        if (converted.legendSections.length >= 2 && updatedShiftSet) {
+          const allLegendShiftIds = new Set([
+            ...legendToShiftIds(converted.legendSections[0], GOVERNMENT_SYMBOL_MAPPING, updatedShiftSet),
+            ...legendToShiftIds(converted.legendSections[1], GOVERNMENT_SYMBOL_MAPPING, updatedShiftSet),
+          ]);
+          if (allLegendShiftIds.size > 0) {
+            for (const shift of updatedShiftSet.shifts) {
+              if (!allLegendShiftIds.has(shift.id)) {
+                updatedShiftSet = updatedShiftSet.remove(shift.id);
+              }
+            }
+          }
+        }
+
         const changed: { type: string; obj: unknown }[] = [];
         if (updatedGroup !== staffGroup) {
           changed.push({ type: WORKING_STAFF_GROUP_TYPE, obj: updatedGroup });
+        }
+        if (updatedShiftSet && updatedShiftSet !== workShiftSet) {
+          changed.push({ type: WORKSHIFT_SET_TYPE, obj: updatedShiftSet });
         }
         if (changed.length > 0) {
           recordMembershipEdit(store, {
