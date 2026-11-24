@@ -36,6 +36,7 @@ import {
   type CandidateCellRefPlain,
   type CandidateRequest,
 } from "./candidateRequest.js";
+import { dayOffWishReason } from "../../ui/shiftWishOptions.js";
 import type {
   CandidateWorkerRequest,
   CandidateWorkerResponse,
@@ -179,6 +180,19 @@ export function useScheduleCandidates({
       ? diffScheduleCells(reusable.schedule, schedule)
       : undefined;
 
+    // 希望から休み種別の reason を集める（"day-off:年" → "年"）
+    const reasonSet = new Set<string>();
+    for (const wish of wishByStaff.values()) {
+      for (const day of schedule.workingDays()) {
+        const wishes = wish.wishesOn(day);
+        for (const key of Object.keys(wishes)) {
+          const reason = dayOffWishReason(key);
+          if (reason) reasonSet.add(reason);
+        }
+      }
+    }
+    const dayOffReasons = reasonSet.size > 0 ? [...reasonSet] : undefined;
+
     const request: CandidateRequest = {
       schedule: schedule.toPlain(),
       staffIds,
@@ -187,6 +201,7 @@ export function useScheduleCandidates({
       checkShiftWish,
       wishes: [...wishByStaff.values()].map((w) => w.toPlain()),
       staffGroup: staffGroup?.toPlain() ?? null,
+      dayOffReasons,
       previous: reusable?.candidates.toPlain(),
       changed: changed?.map((cell) => ({
         staffId: cell.staffId,

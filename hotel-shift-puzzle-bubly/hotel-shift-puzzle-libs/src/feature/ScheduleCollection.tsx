@@ -74,7 +74,8 @@ export const ScheduleCollection: FC<{
           return undefined;
         })
       : undefined;
-    createSchedule(store, { ...params, inheritance });
+    const formatId = Store.resolve(recordedStores, params.storeId, removedStoreIds).format.id;
+    createSchedule(store, { ...params, formatId, inheritance });
   };
 
   // 一覧に引き継ぎを直接出す（#231）。確定版を持つ勤務表には 🏁、取り込んでいない

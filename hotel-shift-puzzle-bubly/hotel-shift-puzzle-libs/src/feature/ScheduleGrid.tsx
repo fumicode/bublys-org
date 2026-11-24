@@ -29,6 +29,7 @@ import {
   type AutoShiftStep,
   type ScheduleRepair,
   type ShiftCell,
+  createGovernmentDayOffTypeSet,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
@@ -99,6 +100,7 @@ import {
   SHIFT_WISH_MONTH_VIEW_TYPE,
   SCHEDULE_WORLD_LINE_VIEW_TYPE,
   SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE,
+  SHIFT_EXCEL_VIEW_TYPE,
 } from "../ui/viewObjectTypes.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
 
@@ -135,6 +137,8 @@ type ScheduleGridProps = {
    * ダブルクリックでこの URL のバブルを開く。URL スキームは app 層の関心事なので注入で受ける。
    */
   reservationInfoUrl?: string;
+  /** Excel入出力バブルの URL。渡すとフッターに Excel ボタンを出す。 */
+  shiftExcelUrl?: string;
   /**
    * 制約1つぶんのバブル URL を作る。上部ルール行の全アイコンがこれで開く。
    * URL スキームは app 層の関心事なので、種類とキーだけ渡して作ってもらう。
@@ -164,6 +168,8 @@ type ScheduleGridProps = {
   onOpenReview?: () => void;
   /** 前月の振り返りバブルの URL を作る（前月の勤務表IDを渡す）。引き継ぎ欄から開く */
   precedingReviewUrl?: (scheduleId: string) => string;
+  /** 休みの種別（行政用）。ドロップダウンのサブメニューに出す */
+  dayOffTypes?: readonly import("@bublys-org/hotel-shift-puzzle-model").DayOffType[];
 };
 
 /** 新しい責任者ルールの一意キーを生成する。 */
@@ -186,11 +192,13 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   bubbleUrlOf,
   staffBubbleUrl,
   reservationInfoUrl,
+  shiftExcelUrl,
   onOpenRule,
   createCandidatesWorker,
   reviewUrl,
   onOpenReview,
   precedingReviewUrl,
+  dayOffTypes,
 }) => {
   const store = useAppStore();
   const { scope } = useScheduleHistory();
@@ -227,7 +235,14 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
   // storeId は人に見せない。見せるのは店舗の名前（記録が無ければ ID のまま）
-  const storeName = useStore(schedule?.storeId)?.name ?? "";
+  const resolvedStore = useStore(schedule?.storeId);
+  const storeName = resolvedStore?.name ?? "";
+  const resolvedDayOffTypes = useMemo(
+    () => dayOffTypes ?? (resolvedStore?.format.id === "government"
+      ? createGovernmentDayOffTypeSet("").types
+      : undefined),
+    [dayOffTypes, resolvedStore?.format.id]
+  );
 
   // ----- 部署フィルタ / グルーピング状態 -----
   const [groupByDept, setGroupByDept] = useState(false);
@@ -940,6 +955,20 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
             </ObjectView>
           )}
 
+          {/* Excel入出力。ダブルクリックでバブルを開く */}
+          {shiftExcelUrl && (
+            <ObjectView
+              type={SHIFT_EXCEL_VIEW_TYPE}
+              url={shiftExcelUrl}
+              label="Excel入出力"
+              openingPosition="bubble-side-right"
+            >
+              <span className="e-link" title="ダブルクリックでExcel入出力を開く">
+                Excel
+              </span>
+            </ObjectView>
+          )}
+
           {/* 前月の確定版からの引き継ぎ。新しい確定版があれば取り込みを促す（precedingMonth.ts）。
               ★を休みの優先度に使うかは制約欄の「★優先」（limitSpecs）で切り替える。 */}
           <InheritanceView
@@ -1055,6 +1084,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
           onApproveForced={handleApproveForced}
+          dayOffTypes={resolvedDayOffTypes}
         />
       </div>
 

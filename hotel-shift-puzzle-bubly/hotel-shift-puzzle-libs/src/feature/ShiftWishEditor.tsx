@@ -17,7 +17,7 @@ import { useObject, useObjectRepo } from "../objects/repository.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
-  GLOBAL_WORKSHIFT_SET_ID,
+  globalWorkShiftSetId,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 
@@ -25,6 +25,8 @@ type Props = {
   staffId: string;
   /** 希望を出す期 */
   period: SchedulePeriod;
+  /** 形態ID（"hotel" / "government"）。対応するグローバル勤務帯セットから選択肢を作る */
+  formatId?: string;
 };
 
 /**
@@ -35,10 +37,10 @@ type Props = {
  * する（＝その内容で確定。取り消すまで書き換えられない）。対象の人・期は URL で決まるので、
  * この画面の中で対象が入れ替わることはない。
  */
-export const ShiftWishEditor: FC<Props> = ({ staffId, period }) => {
+export const ShiftWishEditor: FC<Props> = ({ staffId, period, formatId = "hotel" }) => {
   const staff = useObject<Staff>(STAFF_TYPE, staffId);
   // 希望は勤務表に紐づかない（スタッフ×期）ので、グローバルの勤務帯セットから選択肢を作る
-  const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, GLOBAL_WORKSHIFT_SET_ID);
+  const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, globalWorkShiftSetId(formatId));
   const workShifts = workShiftSet?.shifts ?? [];
   const wishId = StaffMonthlyShiftWish.idOf(staffId, period);
   const stored = useObject<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE, wishId);

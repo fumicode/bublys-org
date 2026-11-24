@@ -23,6 +23,8 @@ export * from './schedule/WorkingDay.js';
 export * from './schedule/SchedulePeriod.js';
 export * from './schedule/WorkShift.js';
 export * from './schedule/WorkShiftSet.js';
+export * from './schedule/DayOffType.js';
+export * from './schedule/DayOffTypeSet.js';
 export * from './schedule/ShiftAssignment.js';
 export * from './schedule/resolveShiftInput.js';
 // セルのコピー・貼り付け（値のみ＝位置で / オブジェクトとして＝人と日で）
@@ -76,3 +78,6 @@ export * from './schedule/affectedCells.js';
 export * from './schedule/ScheduleCandidates.js';
 export * from './schedule/computeCandidates.js';
 export * from './schedule/repairDeadCell.js';
+
+// インポート/エクスポート（行政版シフトCSV/Excelの読み書き）
+export * from './import-export/index.js';

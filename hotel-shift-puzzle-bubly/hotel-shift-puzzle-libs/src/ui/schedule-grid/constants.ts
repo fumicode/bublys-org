@@ -3,11 +3,39 @@ export const SHIFT_BG: Record<string, string> = {
   early: "#e3f2fd",
   middle: "#fff8e1",
   late: "#f3e5f5",
+  // 行政：正規職員
+  "shift-A": "#e3f2fd",
+  "shift-B": "#e8f5e9",
+  "shift-E": "#fff8e1",
+  "shift-H": "#fce4ec",
+  "shift-h": "#f3e5f5",
+  // 行政：会計年度任用
+  "shift-①": "#e0f7fa",
+  "shift-②": "#fff3e0",
+  "shift-③": "#f1f8e9",
+  "shift-④": "#ede7f6",
+  "shift-⑤": "#fbe9e7",
+  "shift-⑥": "#e8eaf6",
+  "shift-⑦": "#efebe9",
 };
 export const SHIFT_FG: Record<string, string> = {
   early: "#1565c0",
   middle: "#ef6c00",
   late: "#6a1b9a",
+  // 行政：正規職員
+  "shift-A": "#1565c0",
+  "shift-B": "#2e7d32",
+  "shift-E": "#ef6c00",
+  "shift-H": "#c62828",
+  "shift-h": "#6a1b9a",
+  // 行政：会計年度任用
+  "shift-①": "#00838f",
+  "shift-②": "#e65100",
+  "shift-③": "#558b2f",
+  "shift-④": "#4527a0",
+  "shift-⑤": "#bf360c",
+  "shift-⑥": "#283593",
+  "shift-⑦": "#4e342e",
 };
 
 // グリッドの列幅

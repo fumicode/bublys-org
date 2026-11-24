@@ -35,6 +35,7 @@ import {
   LeaderRuleView,
   ShiftIntervalRuleView,
   WorldFilePanel,
+  ShiftExcelPanel,
 } from "@bublys-org/hotel-shift-puzzle-libs";
 import { availablePeriodRuleKinds, availableStoreFormats } from "./storeFormats.js";
 // バブル URL スキーム（app 層で一元管理）。import すると同時にオブジェクト URL の
@@ -53,6 +54,7 @@ import {
   scheduleStaffDetailUrl,
   scheduleReviewUrl,
   scheduleUrl,
+  shiftExcelUrl,
 } from "./bubbleUrls.js";
 
 // 全バブルは統一リポジトリ（アプリ全体の世界線スコープ）にアクセスするため、
@@ -119,11 +121,14 @@ const ShiftWishMonthBubble: BubbleRoute["Component"] = ({ bubble }) => {
 const ShiftWishBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const period = periodOfWishParams(bubble.params);
   if (!period) return invalidPeriod;
-  return withObjects(<ShiftWishEditor staffId={bubble.params.staffId} period={period} />);
+  return withObjects(
+    <ShiftWishEditor staffId={bubble.params.staffId} period={period} formatId={availableStoreFormats[0].id} />
+  );
 };
 
 // --- 勤務帯リストバブル（リスト内で追加・編集） ---
-const WorkShiftListBubble: BubbleRoute["Component"] = () => withObjects(<WorkShiftCollection />);
+const WorkShiftListBubble: BubbleRoute["Component"] = () =>
+  withObjects(<WorkShiftCollection formatId={availableStoreFormats[0].id} />);
 
 // --- 制約セットバブル（グローバルのテンプレート。勤務表作成時にコピーされる） ---
 const ConstraintSetBubble: BubbleRoute["Component"] = () =>
@@ -195,6 +200,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
         scheduleViolationUrl(scheduleId, violationKey)
       }
       reservationInfoUrl={scheduleReservationInfoUrl(scheduleId)}
+      shiftExcelUrl={availableStoreFormats.some(f => f.id === "government") ? shiftExcelUrl(scheduleId) : undefined}
       createCandidatesWorker={createCandidatesWorker}
       reviewUrl={rvUrl}
       onOpenReview={() => openSide(rvUrl, "bubble-side-right")}
@@ -302,6 +308,10 @@ const LegacyScheduleShiftIntervalRuleBubble: BubbleRoute["Component"] = ({
     />
   );
 
+// --- Excel入出力バブル（勤務表のインポート・エクスポート） ---
+const ShiftExcelBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<ShiftExcelPanel scheduleId={bubble.params.scheduleId} />);
+
 // --- 勤務表ファイルバブル（世界線ごとローカルファイルへ保存・読み込み） ---
 // 世界全体を扱うので勤務表 ID は取らない。Provider 配下に置くのは他バブルと同じ。
 const WorldFileBubble: BubbleRoute["Component"] = () =>
@@ -352,6 +362,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/constraints/:constraintSetId/leader-rules/:ruleKey", type: "constraint-leader-rule", Component: LeaderRuleBubble },
   { pattern: "hotel-shift-puzzle/constraints/:constraintSetId/shift-interval-rules/:ruleKey", type: "constraint-shift-interval-rule", Component: ShiftIntervalRuleBubble },
   { pattern: "hotel-shift-puzzle/constraints", type: "constraint-set", Component: ConstraintSetBubble, bubbleOptions: { defaultSize: { width: 760, height: 460 } } },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/excel", type: "shift-excel", Component: ShiftExcelBubble, bubbleOptions: { defaultSize: { width: 400, height: 380 } } },
   { pattern: "hotel-shift-puzzle/file", type: "world-file", Component: WorldFileBubble },
   // インスペクタは表が詰まっているので、窓型（fillsContainer）で大きめに開く
   { pattern: "hotel-shift-puzzle/world-line-inspector", type: "world-line-inspector", Component: WorldLineInspectorBubble, bubbleOptions: { fillsContainer: true, defaultSize: { width: 900, height: 600 } } },

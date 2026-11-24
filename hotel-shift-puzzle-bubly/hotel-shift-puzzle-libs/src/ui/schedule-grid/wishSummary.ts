@@ -1,6 +1,7 @@
-import type { WorkingDay, StaffMonthlyShiftWish, WorkShift } from "../../domain/index.js";
+import type { WorkingDay, StaffMonthlyShiftWish, WorkShift, DayOffType } from "../../domain/index.js";
 import {
   DAY_OFF_WISH,
+  dayOffWishReason,
   isWorkWish,
   workWishName,
   wishOptionLabel,
@@ -37,12 +38,16 @@ const FALLBACK_COLOR = "#607d8b";
  *
  * shiftOf（勤務帯名 → 勤務帯）を渡すと、勤務帯の希望を「開始時刻の時」1文字で出せる
  * （＝実際に入力した勤務帯セルと同じ見た目の粒度になる）。省略時は名前の頭1文字。
+ *
+ * dayOffTypeOf を渡すと、"day-off" 以外の休暇希望キーがあった場合に
+ * DayOffType の shortName で表示できる（将来の拡張用）。
  */
 export function wishEntriesFor(
   wishByStaff: Map<string, StaffMonthlyShiftWish> | undefined,
   staffId: string,
   day: WorkingDay,
-  shiftOf?: (shiftName: string) => WorkShift | undefined
+  shiftOf?: (shiftName: string) => WorkShift | undefined,
+  dayOffTypeOf?: (key: string) => DayOffType | undefined,
 ): WishEntry[] {
   const wishes = wishByStaff?.get(staffId)?.wishesOn(day);
   if (!wishes) return [];
@@ -57,12 +62,35 @@ export function wishEntriesFor(
         color: DAY_OFF_WISH_COLOR,
       };
     }
+    // 種別つき休み希望キー（"day-off:年" など）
+    const reason = dayOffWishReason(key);
+    if (reason) {
+      const dayOffType = dayOffTypeOf?.(key);
+      return {
+        key,
+        label: dayOffType?.name ?? reason,
+        char: dayOffType?.shortName ?? reason.slice(0, 1),
+        pref,
+        color: DAY_OFF_WISH_COLOR,
+      };
+    }
+    // レガシーの休暇希望キー（DayOffType で解決を試みる）
+    const dayOffType = dayOffTypeOf?.(key);
+    if (dayOffType) {
+      return {
+        key,
+        label: dayOffType.name,
+        char: dayOffType.shortName,
+        pref,
+        color: DAY_OFF_WISH_COLOR,
+      };
+    }
     const name = isWorkWish(key) ? workWishName(key) : key;
     const shift = shiftOf?.(name);
     return {
       key,
       label: wishOptionLabel(key),
-      char: shift ? String(shift.startHour) : name.slice(0, 1),
+      char: shift ? (shift.shortName ?? String(shift.startHour)) : name.slice(0, 1),
       pref,
       shiftId: shift?.id,
       color: (shift && SHIFT_FG[shift.id]) || FALLBACK_COLOR,

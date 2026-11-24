@@ -11,6 +11,7 @@ import {
   DailyReservationInfo,
   ConstraintViolation,
   StaffMonthlyShiftWish,
+  type DayOffType,
   type ShiftCell,
   type ShiftSuggestion,
   type ScheduleConstraint,
@@ -192,6 +193,8 @@ type ScheduleGridViewProps = {
     cell: ShiftCell,
     direction: ApproveDirection
   ) => boolean;
+  /** 休みの種別（行政用）。ドロップダウンのサブメニューに出す */
+  dayOffTypes?: readonly DayOffType[];
 };
 
 /**
@@ -266,6 +269,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   forcedCellOf,
   isDeadCell,
   onApproveForced,
+  dayOffTypes,
 }) => {
   const days = schedule.workingDays();
 
@@ -415,8 +419,14 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     return m;
   }, [workShifts]);
 
+  const dayOffTypeMap = useMemo(() => {
+    if (!dayOffTypes || dayOffTypes.length === 0) return undefined;
+    const m = new Map(dayOffTypes.map((t) => [t.id, t]));
+    return (key: string) => m.get(key);
+  }, [dayOffTypes]);
+
   const getWishEntries = (staffId: string, day: WorkingDay) =>
-    wishEntriesFor(wishByStaff, staffId, day, (name) => shiftByName.get(name));
+    wishEntriesFor(wishByStaff, staffId, day, (name) => shiftByName.get(name), dayOffTypeMap);
 
   // ----- 必要人数 -----
   const [editingRequired, setEditingRequired] = useState<EditingRequired | null>(null);
@@ -813,6 +823,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         activeIndex={kb.activeIndex}
         onPick={kb.applySuggestion}
         faceOf={optionFaceFor}
+        dayOffTypes={dayOffTypes}
       />
     </StyledWrap>
   );

@@ -52,6 +52,8 @@ export type CandidateRequest = {
    * 群がまだ無い勤務表なら null（可能勤務帯の制約は足さない）。
    */
   staffGroup: WorkingStaffGroupPlain | null;
+  /** 休み種別の reason 一覧（"年" "介護" など）。種別ごとの休み候補を加える */
+  dayOffReasons?: string[];
   /**
    * 差分計算するときだけ渡す。previous（前回の候補集合）と changed（変わったセル）が
    * 揃っているときは影響範囲だけ計算し、揃っていなければ全計算する。
@@ -85,6 +87,7 @@ function rebuildInput(request: CandidateRequest): CandidateComputationInput {
     schedule,
     workShifts,
     staffIds: request.staffIds,
+    dayOffReasons: request.dayOffReasons,
     constraints: buildScheduleConstraints({
       modelConstraints: aggregate?.modelConstraints(shiftIdsOf),
       wish: request.checkShiftWish ? { wishByStaff, shiftNameById } : undefined,

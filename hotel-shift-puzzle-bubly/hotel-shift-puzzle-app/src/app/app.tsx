@@ -16,6 +16,12 @@ import { useAppDispatch, setLightweightMode } from '@bublys-org/state-management
 
 BubbleRouteRegistry.registerRoutes(hotelShiftPuzzleBubbleRoutes);
 
+const SUBTITLE_BY_FORMAT: Record<string, string> = {
+  hotel: "旅館のシフトを、試しながら作る",
+  government: "シフトを、試しながら作る",
+};
+const appSubtitle = SUBTITLE_BY_FORMAT[availableStoreFormats[0].id] ?? SUBTITLE_BY_FORMAT.hotel;
+
 /** 開いた瞬間に見せるバブル（例データの有無で変わる。下の initialBubbleUrls の註） */
 const INITIAL_BUBBLE_URLS = hasSampleFor(availableStoreFormats)
   ? ['hotel-shift-puzzle/schedules', scheduleUrl(MID_MONTH_SCHEDULE_ID)]
@@ -76,7 +82,7 @@ export function App() {
       <LightweightByDefault />
       <BublyApp
         title="シフトントン"
-        subtitle="旅館のシフトを、試しながら作る"
+        subtitle={appSubtitle}
         menuItems={menuItems}
         backdropColor="hsl(20, 40%, 22%)"
         // 岸はいったん切る。縁の近くで離すと思いがけず貼り付いて、初めての人が戸惑う

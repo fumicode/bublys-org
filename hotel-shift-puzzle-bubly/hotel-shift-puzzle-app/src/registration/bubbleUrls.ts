@@ -133,6 +133,10 @@ export const scheduleViolationUrl = (
   violationKey: string
 ): string => `hotel-shift-puzzle/schedules/${scheduleId}/violations/${violationKey}`;
 
+/** Excel入出力バブル（勤務表のインポート・エクスポート） */
+export const shiftExcelUrl = (scheduleId: string): string =>
+  `hotel-shift-puzzle/schedules/${scheduleId}/excel`;
+
 /**
  * 勤務表ファイルバブル（ローカルファイルへの保存・読み込み）。
  * 特定の勤務表ではなく世界全体を扱うので、勤務表の下ではなくトップレベルに置く。

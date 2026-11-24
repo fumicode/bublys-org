@@ -906,6 +906,113 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "DayOffType",
+      "file": "schedule/DayOffType.ts",
+      "kind": "part",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "shortName",
+          "type": "string",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "id",
+        "name",
+        "shortName"
+      ],
+      "methods": [
+        {
+          "name": "of",
+          "params": [
+            "id",
+            "name",
+            "shortName"
+          ],
+          "returns": "DayOffType",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "DayOffTypeSet",
+      "file": "schedule/DayOffTypeSet.ts",
+      "kind": "part",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "types",
+          "type": "DayOffType[]",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "id",
+        "types"
+      ],
+      "methods": [
+        {
+          "name": "of",
+          "params": [
+            "id",
+            "types"
+          ],
+          "returns": "DayOffTypeSet",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "find",
+          "params": [
+            "typeId"
+          ],
+          "returns": "DayOffType | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "withId",
+          "params": [
+            "newId"
+          ],
+          "returns": "DayOffTypeSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "DayOffTypeSetPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "DayOffTypeSet",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
       "name": "EmojiTag",
       "file": "staff/EmojiTag.ts",
       "kind": "value",
@@ -1233,7 +1340,8 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "assignDayOff",
           "params": [
             "staffId",
-            "day"
+            "day",
+            "reason"
           ],
           "returns": "MonthlyStaffSchedule",
           "isStatic": false,
@@ -2332,6 +2440,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "shift",
           "type": "ShiftValue",
           "optional": false
+        },
+        {
+          "name": "dayOffReason",
+          "type": "string",
+          "optional": true
         }
       ],
       "getters": [
@@ -2339,6 +2452,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "day",
         "shift",
         "isDayOff",
+        "dayOffReason",
         "isUndecided",
         "isWorking",
         "shiftId"
@@ -3156,6 +3270,112 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "SymbolMapping",
+      "file": "import-export/SymbolMapping.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "entries",
+          "type": "SymbolEntryPlain[]",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "entries"
+      ],
+      "methods": [
+        {
+          "name": "interpret",
+          "params": [
+            "symbol"
+          ],
+          "returns": "SymbolInterpretation | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "isConfirmedDayOff",
+          "params": [
+            "symbol"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "isEmpty",
+          "params": [
+            "symbol"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "symbolForDayOff",
+          "params": [
+            "reason"
+          ],
+          "returns": "string | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "symbolForWish",
+          "params": [
+            "optionKey"
+          ],
+          "returns": "string | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "addEntry",
+          "params": [
+            "entry"
+          ],
+          "returns": "SymbolMapping",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "removeEntry",
+          "params": [
+            "symbol"
+          ],
+          "returns": "SymbolMapping",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "updateEntry",
+          "params": [
+            "symbol",
+            "update"
+          ],
+          "returns": "SymbolMapping",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "SymbolMappingState",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "SymbolMapping",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
       "name": "WorkingDay",
       "file": "schedule/WorkingDay.ts",
       "kind": "value",
@@ -3638,6 +3858,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": false
         },
         {
+          "name": "shortName",
+          "type": "string",
+          "optional": true
+        },
+        {
           "name": "aliases",
           "type": "string[]",
           "optional": true
@@ -3646,6 +3871,7 @@ export const MODEL_GRAPH: ModelGraph = {
       "getters": [
         "id",
         "name",
+        "shortName",
         "aliases",
         "startMinute",
         "startHour",
@@ -3886,6 +4112,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "via": "scheduleId",
       "many": false,
       "foundBy": "id-naming"
+    },
+    {
+      "from": "DayOffTypeSet",
+      "to": "DayOffType",
+      "kind": "contains",
+      "via": "types",
+      "many": true,
+      "foundBy": "type"
     },
     {
       "from": "FourWeekPeriod",
@@ -4146,7 +4380,7 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 54,
+    "fileCount": 61,
     "classesWithoutState": [
       "AllowedShiftConstraint",
       "CalendarMonthRule",

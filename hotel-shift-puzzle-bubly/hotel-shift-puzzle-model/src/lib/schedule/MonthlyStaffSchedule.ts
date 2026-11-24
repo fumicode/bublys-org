@@ -85,12 +85,13 @@ export type MonthlyStaffSchedulePlain = PeriodFields & {
 /** セルの状態（出勤／休み／未定）。出勤は勤務帯ID で表す */
 export type ShiftCell =
   | { kind: "work"; shiftId: string }
-  | { kind: "day-off" }
+  | { kind: "day-off"; reason?: string }
   | { kind: "undecided" };
 
 /** ShiftCell を JSON 比較可能なキーにする */
 export function shiftCellKey(cell: ShiftCell): string {
   if (cell.kind === "work") return `work:${cell.shiftId}`;
+  if (cell.kind === "day-off" && cell.reason) return `day-off:${cell.reason}`;
   return cell.kind;
 }
 
@@ -235,8 +236,8 @@ export class MonthlyStaffSchedule {
   }
 
   /** 休みを割り当てる（既存割当は上書き）。不変。 */
-  assignDayOff(staffId: string, day: WorkingDay): MonthlyStaffSchedule {
-    return this.withAssignment(staffId, day, DAY_OFF);
+  assignDayOff(staffId: string, day: WorkingDay, reason?: string): MonthlyStaffSchedule {
+    return this.withAssignment(staffId, day, DAY_OFF, reason);
   }
 
   /** 未定にする（明示的に null を立てる）。不変。 */
@@ -274,19 +275,25 @@ export class MonthlyStaffSchedule {
    */
   setCell(staffId: string, day: WorkingDay, to: ShiftCell): MonthlyStaffSchedule {
     if (to.kind === "work") return this.assignShift(staffId, day, to.shiftId);
-    if (to.kind === "day-off") return this.assignDayOff(staffId, day);
+    if (to.kind === "day-off") return this.assignDayOff(staffId, day, to.reason);
     return this.clearAssignment(staffId, day);
   }
 
   private withAssignment(
     staffId: string,
     day: WorkingDay,
-    shift: ShiftValue
+    shift: ShiftValue,
+    dayOffReason?: string,
   ): MonthlyStaffSchedule {
     const filtered = this.state.assignments.filter(
       (a) => !(a.staffId === staffId && a.day.equals(day))
     );
-    const next = new ShiftAssignment({ staffId, day, shift });
+    const next = new ShiftAssignment({
+      staffId,
+      day,
+      shift,
+      ...(dayOffReason ? { dayOffReason } : {}),
+    });
     return new MonthlyStaffSchedule({
       ...this.state,
       assignments: [...filtered, next],
@@ -306,7 +313,9 @@ export class MonthlyStaffSchedule {
       return { kind: "work", shiftId: assignment.shiftId as string };
     }
     if (assignment?.isDayOff) {
-      return { kind: "day-off" };
+      return assignment.dayOffReason
+        ? { kind: "day-off", reason: assignment.dayOffReason }
+        : { kind: "day-off" };
     }
     return { kind: "undecided" };
   }
