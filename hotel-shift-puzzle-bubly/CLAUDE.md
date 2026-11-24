@@ -15,7 +15,11 @@ hotel-shift-puzzle-bubly/
   hotel-shift-puzzle-model/   # ドメイン層（純粋 TypeScript、外部依存なし）
   hotel-shift-puzzle-libs/    # 機能・UI 層（React + Redux）
   hotel-shift-puzzle-app/     # アプリ層（バブルルート登録、エントリーポイント）
+  hotel-shift-puzzle-electron/# デスクトップ版（EXE）。app の dist/ をネットにつながない窓で開くだけ（README 参照）
 ```
+
+> デスクトップ版はオリジン（`app://shiftonton`）とデータのフォルダが Web 版と違う。
+> **その識別子は一度配ったら変えない**（変えると勤務表が見えなくなる）。
 
 ### 依存方向
 

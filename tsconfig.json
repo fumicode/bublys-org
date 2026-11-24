@@ -193,6 +193,9 @@
       "path": "./henge-bubly/henge-app"
     },
     {
+      "path": "./hotel-shift-puzzle-bubly/hotel-shift-puzzle-electron"
+    },
+    {
       "path": "./koyomi-bubly/koyomi-model"
     },
     {
