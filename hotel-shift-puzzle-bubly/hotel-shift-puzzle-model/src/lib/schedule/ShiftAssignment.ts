@@ -30,6 +30,8 @@ export type ShiftAssignmentState = {
   day: WorkingDay;
   /** 勤務帯ID | DAY_OFF(休み) | null(未定) */
   shift: ShiftValue;
+  /** 休みの種別（"weekly" / "annual" 等）。shift が DAY_OFF のときだけ意味を持つ */
+  dayOffReason?: string;
 };
 
 /** シリアライズ用：入れ子まで全部 plain */
@@ -37,6 +39,7 @@ export type ShiftAssignmentPlain = {
   staffId: string;
   day: WorkingDayState;
   shift: ShiftValue;
+  dayOffReason?: string;
 };
 
 export class ShiftAssignment {
@@ -60,6 +63,11 @@ export class ShiftAssignment {
     return this.state.shift === DAY_OFF;
   }
 
+  /** 休みの種別（shift が DAY_OFF のときだけ意味を持つ） */
+  get dayOffReason(): string | undefined {
+    return this.state.dayOffReason;
+  }
+
   /** 未定（まだ決まっていない）かどうか */
   get isUndecided(): boolean {
     return this.state.shift === null;
@@ -80,6 +88,7 @@ export class ShiftAssignment {
       staffId: this.state.staffId,
       day: this.state.day.state,
       shift: this.state.shift,
+      ...(this.state.dayOffReason ? { dayOffReason: this.state.dayOffReason } : {}),
     };
   }
 
@@ -88,6 +97,7 @@ export class ShiftAssignment {
       staffId: plain.staffId,
       day: new WorkingDay(plain.day),
       shift: plain.shift,
+      ...(plain.dayOffReason ? { dayOffReason: plain.dayOffReason } : {}),
     });
   }
 }

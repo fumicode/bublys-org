@@ -29,6 +29,7 @@ import type { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 import type { WorkingDay } from "./WorkingDay.js";
 import type { DecodedWish } from "./autoShiftStep.js";
 import { DayOffStyle } from "../staff/DayOffStyle.js";
+import { CALENDAR_MONTH_WORDS, type PeriodWords } from "./SchedulePeriod.js";
 
 /** 連休の相方にできなかった隣の日の事情 */
 export type NeighborBlock =
@@ -183,23 +184,26 @@ const NEIGHBOR_TEXT: Record<NeighborBlock, string> = {
   "work-wish": "出勤の希望",
   "day-cap": "休みが1日の上限",
   triple: "休むと3連休になる",
-  "prev-month": "前月の確定分",
+  "prev-month": "の確定分",  // 前に「前月」「前の期」を付ける（期の言葉）
   constraint: "制約で休みを置けない",
 };
 
 /** 連休にできなかった理由を1行にする */
 export function unpairedReasonText(
   reason: UnpairedReason,
-  opts: { maxDayOffPerDay?: number } = {}
+  opts: { maxDayOffPerDay?: number; words?: PeriodWords } = {}
 ): string {
+  const words = opts.words ?? CALENDAR_MONTH_WORDS;
   if (reason.kind === "out-of-days") {
-    return `連休にできなかった：月の休み（${reason.minDayOff}日）を連勤の区切りに使い切った`;
+    return `連休にできなかった：${words.unit}の休み（${reason.minDayOff}日）を連勤の区切りに使い切った`;
   }
   const parts = reason.neighbors.map(({ day, why }) => {
     const text =
       why === "day-cap" && opts.maxDayOffPerDay !== undefined
         ? `休みが1日の上限（${opts.maxDayOffPerDay}人）`
-        : NEIGHBOR_TEXT[why];
+        : why === "prev-month"
+          ? `${words.previous}${NEIGHBOR_TEXT[why]}`
+          : NEIGHBOR_TEXT[why];
     return `${day.month}/${day.day}は${text}`;
   });
   return `連休にできなかった：${parts.join("・")}`;
@@ -209,8 +213,10 @@ export function unpairedReasonText(
 export function dayOffReasonText(
   reason: DayOffReason,
   style: DayOffStyle,
-  opts: { maxDayOffPerDay?: number } = {}
+  /** words は勤務表の期の言葉（省略すると暦月の言葉） */
+  opts: { maxDayOffPerDay?: number; words?: PeriodWords } = {}
 ): string {
+  const words = opts.words ?? CALENDAR_MONTH_WORDS;
   const body = (() => {
     switch (reason.kind) {
       case "wish":
@@ -220,7 +226,7 @@ export function dayOffReasonText(
           ? `外すと${reason.runIfRemoved}連勤になります（この人は${reason.limit}連まで）`
           : `外すと${reason.runIfRemoved}連勤になります（上限${reason.limit}連勤）`;
       case "pair":
-        return reason.acrossMonth ? "前月末から続く連休" : "連休";
+        return reason.acrossMonth ? `${words.previousEnd}から続く連休` : "連休";
       case "between":
         if (reason.before === 0 || reason.after === 0) return "休みの続き";
         return `${reason.before}日と${reason.after}日の出勤の間の休み`;

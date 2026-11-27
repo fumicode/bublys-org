@@ -73,6 +73,19 @@ export class WorkingDay {
     return new Date(this.state.year, this.state.month - 1, this.state.day);
   }
 
+  /** n 日後（負なら前）の日。月・年をまたいでも暦どおりに進む */
+  addDays(n: number): WorkingDay {
+    const d = new Date(this.state.year, this.state.month - 1, this.state.day + n);
+    return WorkingDay.of(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  }
+
+  /** other から何日後か（other より前なら負） */
+  daysSince(other: WorkingDay): number {
+    // 時刻を UTC の正午に揃えて割る（現地時刻の夏時間で1時間ずれても日数が狂わない）
+    const utc = (w: WorkingDay) => Date.UTC(w.year, w.month - 1, w.day, 12);
+    return Math.round((utc(this) - utc(other)) / 86_400_000);
+  }
+
   equals(other: WorkingDay): boolean {
     return this.key === other.key;
   }

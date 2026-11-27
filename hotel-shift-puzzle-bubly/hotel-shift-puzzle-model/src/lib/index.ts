@@ -2,17 +2,29 @@
  * ドメイン層エクスポート
  */
 
+// 店舗（勤務表の外のデータ：名前・形態・期の決め方。勤務表を作るときに読むだけ）
+export * from './store/PeriodRule.js';
+export * from './store/StoreFormat.js';
+export * from './store/Store.js';
+
 // Staff（スタッフ）
 export * from './staff/Staff.js';
 export * from './staff/DayOffStyle.js';
+export * from './staff/EmojiTag.js';
+// スタッフプロファイル（絵文字タグ＋組み込みの表示を束ねる。#236）
+export * from './staff/StaffProfile.js';
 // 勤務スタッフ群（勤務表とスタッフの間の入れ物。名簿から来た人と臨時の人を区別する）
 export * from './staff/WorkingStaffMember.js';
 export * from './staff/WorkingStaffGroup.js';
 
 // 月間スタッフ勤務表（シフト表）
 export * from './schedule/WorkingDay.js';
+// 期（勤務表の区切り。暦月の期・4週の期。起点日で見分け、月には換算しない）
+export * from './schedule/SchedulePeriod.js';
 export * from './schedule/WorkShift.js';
 export * from './schedule/WorkShiftSet.js';
+export * from './schedule/DayOffType.js';
+export * from './schedule/DayOffTypeSet.js';
 export * from './schedule/ShiftAssignment.js';
 export * from './schedule/resolveShiftInput.js';
 // セルのコピー・貼り付け（値のみ＝位置で / オブジェクトとして＝人と日で）
@@ -23,7 +35,7 @@ export * from './schedule/MonthlyStaffSchedule.js';
 export * from './schedule/PrecedingMonthTail.js';
 // 稼働日ごとの予約状況（宿泊人数・部屋数）。勤務表に紐づく姉妹集約。店ごとに付け替える想定。
 export * from './schedule/DailyReservationInfo.js';
-export * from './schedule/ScheduleReport.js';
+export * from './schedule/ConfirmedSchedule.js';
 // 1つの手で制約違反がどう増減したか（候補集合・詰みの解消案で使う）
 export * from './schedule/ConstraintDelta.js';
 
@@ -66,3 +78,6 @@ export * from './schedule/affectedCells.js';
 export * from './schedule/ScheduleCandidates.js';
 export * from './schedule/computeCandidates.js';
 export * from './schedule/repairDeadCell.js';
+
+// インポート/エクスポート（行政版シフトCSV/Excelの読み書き）
+export * from './import-export/index.js';

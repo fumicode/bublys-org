@@ -1,6 +1,11 @@
 "use client";
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { WorldLineGraph } from "@bublys-org/world-line-graph";
+import {
+  MILESTONE_COLOR,
+  MILESTONE_RING_RADIUS_OFFSET,
+  milestoneFlagShape,
+  type WorldLineGraph,
+} from "@bublys-org/world-line-graph";
 import {
   type FoldState,
   type FoldedGraphData,
@@ -45,6 +50,11 @@ export type WorldLinesCanvasViewProps = {
   foldState?: FoldState;
   /** 折りたたみ済みノードをクリックしたとき呼ばれる。 */
   onToggleFold?: (commandGroupId: string) => void;
+  /**
+   * 節目のノード（バブリが「この世界線の中で意味のある地点」と呼ぶもの）。旗を立てて描く
+   * （world-line-graph の milestoneMark）。apex の二重リングとは形で分ける。
+   */
+  milestoneNodeIds?: ReadonlySet<string>;
 };
 
 type NodePos = { x: number; y: number; color: string; foldInfo?: FoldGroupInfo };
@@ -215,6 +225,7 @@ function draw(
   vw: number,
   vh: number,
   background: string | undefined,
+  milestoneNodeIds: ReadonlySet<string> | undefined,
 ) {
   ctx.clearRect(0, 0, vw, vh);
   if (background) {
@@ -286,6 +297,31 @@ function draw(
       ctx.fillText(badge, s.sx, s.sy + 1);
     }
 
+    if (milestoneNodeIds?.has(id)) {
+      // 節目の金色リング
+      ctx.beginPath();
+      ctx.arc(s.sx, s.sy, r + MILESTONE_RING_RADIUS_OFFSET * Math.max(0.6, s.scale), 0, Math.PI * 2);
+      ctx.strokeStyle = MILESTONE_COLOR;
+      ctx.globalAlpha = 0.7;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // 節目の旗（成果木と同じ形。milestoneMark）
+      const { pole, pennant } = milestoneFlagShape(s.sx, s.sy, r, Math.max(0.6, s.scale));
+      ctx.beginPath();
+      ctx.moveTo(pole.x1, pole.y1);
+      ctx.lineTo(pole.x2, pole.y2);
+      ctx.strokeStyle = MILESTONE_COLOR;
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(pennant[0][0], pennant[0][1]);
+      for (const [px, py] of pennant.slice(1)) ctx.lineTo(px, py);
+      ctx.closePath();
+      ctx.fillStyle = MILESTONE_COLOR;
+      ctx.fill();
+    }
   }
 
   // ラベル（ユーザーがつけた名前）はノードの上に吹き出しで。要約とは別レイヤーで
@@ -343,6 +379,7 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
   background,
   foldState,
   onToggleFold,
+  milestoneNodeIds,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -382,6 +419,8 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
   labelizeRef.current = labelize;
   const backgroundRef = useRef(background);
   backgroundRef.current = background;
+  const milestonesRef = useRef(milestoneNodeIds);
+  milestonesRef.current = milestoneNodeIds;
   const onApexScreenPosRef = useRef(onApexScreenPos);
   onApexScreenPosRef.current = onApexScreenPos;
 
@@ -397,7 +436,17 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
       w,
       h,
     );
-    draw(ctx, layoutRef.current, project, apexRef.current, labelizeRef.current, w, h, backgroundRef.current);
+    draw(
+      ctx,
+      layoutRef.current,
+      project,
+      apexRef.current,
+      labelizeRef.current,
+      w,
+      h,
+      backgroundRef.current,
+      milestonesRef.current,
+    );
 
     // apex の画面座標を通知（ラベル入力欄をノード近くに置く用途）
     const cb = onApexScreenPosRef.current;
@@ -498,10 +547,10 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
     renderFrame();
   }, [layout, apexNodeId, setTarget, renderFrame]);
 
-  // label だけの変化（フォーカスは動かさず描画だけ更新）
+  // label・節目だけの変化（フォーカスは動かさず描画だけ更新）
   useEffect(() => {
     renderFrame();
-  }, [labelize, renderFrame]);
+  }, [labelize, milestoneNodeIds, renderFrame]);
 
   // 自前スクロール: wheel でフォーカスを動かす（横＝魚眼軸 / 縦＝パン）
   useEffect(() => {

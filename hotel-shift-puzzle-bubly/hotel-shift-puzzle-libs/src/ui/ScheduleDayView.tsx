@@ -11,9 +11,11 @@ import {
   ShiftLeaderRule,
   StaffMonthlyShiftWish,
   type ShiftCell,
+  type StaffProfile,
 } from "../domain/index.js";
 import { SHIFT_BG, SHIFT_FG, WEEKDAY_LABELS } from "./schedule-grid/constants.js";
-import { LeaderBadges, leaderRoleStyle } from "./LeaderBadges.js";
+import { leaderRoleStyle } from "./leaderRoleColors.js";
+import { ProfileMarkGroups, profileMarkStyles } from "./ProfileMarks.js";
 import { wishEntriesFor, wishText, type WishEntry } from "./schedule-grid/wishSummary.js";
 import { DAY_OFF_WISH } from "./shiftWishOptions.js";
 
@@ -25,8 +27,10 @@ type ScheduleDayViewProps = {
   staffList: Staff[];
   /** この勤務表で使える勤務帯（早番・中番・遅番）。横方向に並べる */
   workShifts: WorkShift[];
-  /** 責任者ルール（解決済み）。名前横に早責/夜責バッジを出す */
+  /** 責任者ルール（解決済み）。下の行で、この日の責任者の充足を出す */
   leaderRules?: ShiftLeaderRule[];
+  /** その人のスタッフプロファイル（#236）。名前の横の記号（🔰・責任者・休みの形…）はこれから描く */
+  profileOf?: (staffId: string) => StaffProfile;
   /** この年月のシフト希望（staffId 別）。希望した勤務帯のセルに円で出す */
   wishByStaff?: Map<string, StaffMonthlyShiftWish>;
   /**
@@ -60,6 +64,7 @@ export const ScheduleDayView: FC<ScheduleDayViewProps> = ({
   staffList,
   workShifts,
   leaderRules = [],
+  profileOf,
   wishByStaff,
   candidates,
   onChangeCell,
@@ -127,7 +132,11 @@ export const ScheduleDayView: FC<ScheduleDayViewProps> = ({
             <tr key={staff.id}>
               <td className="e-staff">
                 <span className="e-staff-name">{staff.name}</span>
-                <LeaderBadges rules={leaderRules} staffId={staff.id} />
+                {profileOf && (
+                  <span className="e-profile-marks">
+                    <ProfileMarkGroups profile={profileOf(staff.id)} />
+                  </span>
+                )}
               </td>
 
               {workShifts.map((w) => {
@@ -303,9 +312,17 @@ const StyledTable = styled.table`
     .e-staff-name {
       font-weight: bold;
     }
+    /* 名前の横の記号（スタッフプロファイル）。分類の順に横へ並べる */
+    .e-profile-marks {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+    ${profileMarkStyles}
     /* 責任者バッジ。配色は leaderRoleStyle（ロールキー→色）を inline で当てる */
     .e-leader-badge {
-      margin-left: 4px;
       font-size: 0.72em;
       font-weight: bold;
       line-height: 1;

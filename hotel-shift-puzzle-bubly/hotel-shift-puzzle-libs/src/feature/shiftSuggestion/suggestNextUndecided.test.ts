@@ -1,4 +1,4 @@
-import { MonthlyStaffSchedule, WorkingDay } from "@bublys-org/hotel-shift-puzzle-model";
+import { MonthlyStaffSchedule, WorkingDay, CalendarMonthPeriod } from "@bublys-org/hotel-shift-puzzle-model";
 import { suggestNextUndecided } from "./suggestNextUndecided.js";
 
 const day = (n: number) => WorkingDay.of(2026, 6, n);
@@ -7,8 +7,7 @@ const emptyJune = () =>
   MonthlyStaffSchedule.create({
     id: "sched-1",
     storeId: "store-1",
-    year: 2026,
-    month: 6,
+    period: CalendarMonthPeriod.of(2026, 6),
   });
 
 describe("suggestNextUndecided", () => {

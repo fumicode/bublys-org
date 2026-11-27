@@ -121,14 +121,11 @@ export const CellFace: FC<CellFaceProps> = ({
     const id = cell.shiftId;
     className += " e-work";
     style = { background: SHIFT_BG[id] ?? "#eee", color: SHIFT_FG[id] ?? "#333" };
-    // 勤務帯は背景色で区別できるので、セルは開始時刻の「時」だけを大きく出す。
-    // 勤務帯名・開始時刻はホバーで分かるよう title に入れる。
-    content = <span className="e-shift-hour">{shift ? shift.startHour : id}</span>;
+    content = <span className="e-shift-hour">{shift ? (shift.shortName ?? shift.startHour) : id}</span>;
     if (shift) title = `${shift.name}（${shift.startTimeLabel}）`;
   } else if (cell.kind === "day-off") {
     className += " e-off";
-    content = "休";
-    // この休みがいまの表で何の役目を果たしているか（触れたときだけ出す）
+    content = cell.reason ?? "休";
     if (dayOffReason) title = dayOffReason;
   } else if (dead) {
     // 詰み: 何を入れてもどれかの制約に反する。承認できる手が無いので値は描かず、
@@ -142,8 +139,10 @@ export const CellFace: FC<CellFaceProps> = ({
     className += " e-undecided e-forced";
     const forcedLabel =
       forcedCandidate.kind === "work"
-        ? (forcedShift?.startHour ?? forcedCandidate.shiftId)
-        : "休";
+        ? (forcedShift?.shortName ?? forcedShift?.startHour ?? forcedCandidate.shiftId)
+        : forcedCandidate.kind === "day-off"
+          ? (forcedCandidate.reason ?? "休")
+          : "休";
     const forcedStyle =
       forcedCandidate.kind === "work"
         ? {

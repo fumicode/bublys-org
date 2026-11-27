@@ -1,6 +1,7 @@
 import { MonthlyStaffSchedule } from './MonthlyStaffSchedule.js';
 import { WorkingDay } from './WorkingDay.js';
 import { ShiftAssignment, DAY_OFF } from './ShiftAssignment.js';
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', () => {
   // 勤務帯（WorkShift）は勤務表とは別集約（WorkShiftSet）。勤務表は割当で勤務帯IDを参照するだけ。
@@ -9,8 +10,7 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
     MonthlyStaffSchedule.create({
       id: 'sched-1',
       storeId: 'store-1',
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
 
   const june1 = WorkingDay.of(2026, 6, 1);

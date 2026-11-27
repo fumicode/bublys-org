@@ -62,6 +62,11 @@ export type WorldLineScopeViewProps = {
    * commandGroupId を持つノード群がレベルに応じて折りたたまれる。
    */
   foldable?: boolean;
+  /**
+   * 節目のノード（バブリが「この世界線の中で意味のある地点」と呼ぶもの）。旗を立てて描く。
+   * 何を節目とするかはバブリが決める（例: hotel は勤務表の確定版）。renderCanvas にもそのまま渡る。
+   */
+  milestoneNodeIds?: ReadonlySet<string>;
 };
 
 export const WorldLineScopeView: FC<WorldLineScopeViewProps> = ({
@@ -73,6 +78,7 @@ export const WorldLineScopeView: FC<WorldLineScopeViewProps> = ({
   style,
   renderCanvas,
   foldable = false,
+  milestoneNodeIds,
 }) => {
   const apexId = scope.graph.getApex()?.id ?? null;
   const apexLabel = (apexId ? scope.graph.state.nodes[apexId]?.label : undefined) ?? "";
@@ -165,6 +171,7 @@ export const WorldLineScopeView: FC<WorldLineScopeViewProps> = ({
         ...(foldable
           ? { foldState, onToggleFold: handleToggleFold }
           : {}),
+        milestoneNodeIds,
       })}
     </div>
   );

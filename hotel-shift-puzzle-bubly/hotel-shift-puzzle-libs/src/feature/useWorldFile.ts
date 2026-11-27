@@ -10,7 +10,7 @@
  * 「このタブが今どのファイルを掴んでいるか」というセッションの事実であり、
  * 変わったときに再描画したいのはファイル名（＝スライス側）だけだから。
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useAppDispatch, useAppSelector, useAppStore } from "@bublys-org/state-management";
 import {
   selectWorldFile,
@@ -23,9 +23,11 @@ import {
   serializeWorldFile,
 } from "../world-file/collectWorldFile.js";
 import { applyWorldFile, clearDocumentScopes } from "../world-file/applyWorldFile.js";
-import { buildSampleItems } from "../objects/seed.js";
+import type { StoreFormat } from "@bublys-org/hotel-shift-puzzle-model";
+import { sampleItemsFor } from "../objects/seed.js";
 import { commitBundle, bornWorldsOf } from "../objects/commit.js";
 import { migrateLegacyScopes } from "../objects/migrateLegacyScopes.js";
+import { migrateLegacyReports } from "../objects/migrateLegacyReports.js";
 import { APP_SCOPE_ID } from "../objects/repository.js";
 import {
   validateWorldFile,
@@ -74,12 +76,13 @@ export interface WorldFileController {
   save: () => Promise<void>;
   saveAs: () => Promise<void>;
   startBlank: () => void;
-  loadSample: () => void;
+  /** 例データを読み込む。このデプロイの形態に例データが無ければ undefined */
+  loadSample: (() => void) | undefined;
   setNote: (note: string) => void;
   dismissMessage: () => void;
 }
 
-export function useWorldFile(): WorldFileController {
+export function useWorldFile(formats: readonly StoreFormat[]): WorldFileController {
   const store = useAppStore();
   const dispatch = useAppDispatch();
   const doc = useAppSelector(selectWorldFile);
@@ -220,6 +223,8 @@ export function useWorldFile(): WorldFileController {
         // 古い形式（固定メンバーの無い世界線）を含むファイルは、ここで作り直す。
         // 勤務表の内容は残り、その試行錯誤の履歴だけが失われる。
         const rebuilt = migrateLegacyScopes(store);
+        // 旧形式の完成レポートを含むファイルは、店舗×月で1つの確定版に畳む（#231）
+        migrateLegacyReports(store);
         dispatch(worldFileSynced({ fileName: name, note: file.note ?? "" }));
 
         const legacyNote =
@@ -261,8 +266,10 @@ export function useWorldFile(): WorldFileController {
    * 1 回の grow でまとめて入れる（同期ループで addObject すると、各 grow が同じ
    * stale なグラフから派生して互いを上書きしてしまう）。
    */
-  const loadSample = useCallback(() => {
-    const items = buildSampleItems();
+  const sampleItems = useMemo(() => sampleItemsFor(formats), [formats]);
+  const loadSampleItems = useCallback(() => {
+    const items = sampleItems;
+    if (!items) return;
     clearDocumentScopes(store);
     commitBundle(store, APP_SCOPE_ID, items);
     // 例データの勤務表にもそれぞれの世界を持たせる。ここで誕生させておかないと、
@@ -273,7 +280,8 @@ export function useWorldFile(): WorldFileController {
       kind: "info",
       text: `例データを読み込みました（${items.length} 件）`,
     });
-  }, [store, detach]);
+  }, [store, detach, sampleItems]);
+  const loadSample = sampleItems ? loadSampleItems : undefined;
 
   const setNote = useCallback(
     (note: string) => {

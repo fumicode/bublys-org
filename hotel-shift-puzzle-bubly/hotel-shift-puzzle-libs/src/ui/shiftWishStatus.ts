@@ -10,7 +10,7 @@
  * 純粋な .ts（React を含まない）なので feature からも import でき、テストもできる。
  * アイコンだけは JSX が要るので ShiftWishStatusIcon.tsx に分けてある。
  */
-import type { Staff, StaffMonthlyShiftWish } from "../domain/index.js";
+import type { SchedulePeriod, Staff, StaffMonthlyShiftWish } from "../domain/index.js";
 
 /** その人・その月の希望がどこまで進んでいるか */
 export type ShiftWishStatus = "empty" | "draft" | "collected";
@@ -42,24 +42,22 @@ export const collectedAtLabel = (iso: string): string => {
   ).padStart(2, "0")}`;
 };
 
-/** 月一覧の1行：その月全体の回収の進み具合 */
-export type ShiftWishMonthProgress = {
-  year: number;
-  /** 1-12 */
-  month: number;
+/** 期の一覧の1行：その期全体の回収の進み具合 */
+export type ShiftWishPeriodProgress = {
+  /** 希望を出す期 */
+  period: SchedulePeriod;
   /** 回収済みの人数 */
   collectedCount: number;
   /** 何かしら入力のある人数（回収済みを含む） */
   startedCount: number;
-  /** その月の対象スタッフ数 */
+  /** その期の対象スタッフ数 */
   staffCount: number;
 };
 
-/** スタッフ詳細の1行：その人の、その月の状況 */
-export type ShiftWishMonthSummary = {
-  year: number;
-  /** 1-12 */
-  month: number;
+/** スタッフ詳細の1行：その人の、その期の状況 */
+export type ShiftWishPeriodSummary = {
+  /** 希望を出す期 */
+  period: SchedulePeriod;
   status: ShiftWishStatus;
   /** 何日ぶん希望を入れたか */
   filledDays: number;
@@ -67,7 +65,7 @@ export type ShiftWishMonthSummary = {
   collectedAt: string | null;
 };
 
-/** 月別一覧の1行：その月の、その人の状況 */
+/** 期ごとの一覧の1行：その期の、その人の状況 */
 export type ShiftWishStaffRow = {
   staff: Staff;
   status: ShiftWishStatus;

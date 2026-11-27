@@ -12,6 +12,7 @@ import { ConstraintSet } from "./ConstraintSet.js";
 import { AllowedShiftConstraint } from "./AllowedShiftConstraint.js";
 import { WorkingStaffGroup } from "../staff/WorkingStaffGroup.js";
 import { WorkingStaffMember } from "../staff/WorkingStaffMember.js";
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 const early = WorkShift.of("early", "早番", { hour: 7 });
 const late = WorkShift.of("late", "遅番", { hour: 15 });
@@ -20,8 +21,7 @@ const emptySchedule = () =>
   MonthlyStaffSchedule.create({
     id: "sched-1",
     storeId: "store-1",
-    year: 2026,
-    month: 6,
+    period: CalendarMonthPeriod.of(2026, 6),
   });
 
 describe("computeAllCandidates", () => {
@@ -189,8 +189,7 @@ describe("recomputeCandidates", () => {
     const other = MonthlyStaffSchedule.create({
       id: "sched-2",
       storeId: "store-1",
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
     const previous = computeAllCandidates({
       schedule: emptySchedule(),

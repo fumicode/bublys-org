@@ -7,11 +7,10 @@ import type {
   WorkShift,
   WorkingDay,
   ConstraintViolation,
-  ShiftLeaderRule,
   ShiftCell,
-  ScheduleReport,
+  StarEntry,
   PrecedingMonthTail,
-  DayOffStyle,
+  StaffProfile,
 } from "../../domain/index.js";
 import { MIN_MONTHLY_DAY_OFF_CONSTRAINT } from "../../domain/index.js";
 import { SHIFT_WISH_MISMATCH } from "../shiftWishOptions.js";
@@ -19,8 +18,7 @@ import { ScheduleDataCell } from "./ScheduleDataCell.js";
 import { PrecedingStaffCells } from "./PrecedingCells.js";
 import { violationMarksOf } from "./violationMarkPlacement.js";
 import { isDayOffSecured, runMarksOf } from "./runMarkPlacement.js";
-import { LeaderBadges } from "../LeaderBadges.js";
-import { DayOffStyleIcon } from "../constraint-icons/DayOffStyleIcon.js";
+import { ProfileMarkGroups } from "../ProfileMarks.js";
 import type { WishEntry } from "./wishSummary.js";
 import type { CellSelection } from "./types.js";
 
@@ -56,12 +54,15 @@ type StaffScheduleRowProps = {
   selected?: boolean;
   /** スタッフの選択をトグルする。渡されたときだけ名前左にチェックボックスを出す */
   onToggleSelected?: (staffId: string) => void;
-  /** 責任者ルール（解決済み）。このスタッフが属するルールを名前横のバッジに出す */
-  leaderRules?: ShiftLeaderRule[];
-  /** 責任者バッジをクリックしたときに、そのルールの関係者を選択させるコールバック */
+  /**
+   * この人のスタッフプロファイル（#236）。記号のある値（🔰・責任者・休みの形…）を
+   * 名前の横に分類の順で出す（ui/ProfileMarks）
+   */
+  profile?: StaffProfile;
+  /** 責任者の記号をクリックしたときに、そのルールの関係者を選択させるコールバック */
   onSelectRule?: (staffIds: string[]) => void;
-  /** 参照レポート。この人にスコアがあれば名前の横に出す（自動シフトで休みを優先する順） */
-  referenceReport?: ScheduleReport;
+  /** 前月の確定版から引き継いだ★。この人にスコアがあれば名前の横に出す（自動シフトで休みを優先する順） */
+  inheritedScores?: readonly StarEntry[];
   /** 名前から開くバブルの URL。省略時はスタッフの正規 URL */
   staffUrl?: string;
   /** 選択モード中で、この行が選択対象（強調＝少し浮かせる） */
@@ -80,8 +81,6 @@ type StaffScheduleRowProps = {
   candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
   /** 休みのセルの役目の説明（休みでないセルには undefined） */
   dayOffReasonOf?: (staffId: string, day: WorkingDay) => string | undefined;
-  /** この人がこの勤務表で使う休みの形。渡されたら名前の横に印を出す */
-  dayOffStyle?: DayOffStyle;
   /**
    * 候補が1つに絞られた未定セルの、その値（確定提案）。無ければ undefined。
    * 渡された値は薄く描かれ、Enter / Tab で承認できる。
@@ -114,9 +113,9 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   violationUrl,
   selected,
   onToggleSelected,
-  leaderRules = [],
+  profile,
   onSelectRule,
-  referenceReport,
+  inheritedScores,
   staffUrl,
   focused,
   dimmed,
@@ -126,7 +125,6 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   earlyShiftIds,
   candidateHintOf,
   dayOffReasonOf,
-  dayOffStyle,
   forcedCellOf,
   isDeadCell,
 }) => {
@@ -141,7 +139,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
     selected && maxConsecutive !== undefined
       ? runMarksOf(schedule, staff.id, days, maxConsecutive, dayOffTarget)
       : [];
-  const priority = referenceReport?.contributionScores.find((s) => s.staffId === staff.id);
+  const priority = inheritedScores?.find((s) => s.staffId === staff.id);
   return (
     <>
       {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開（bubble-side-left）/ ドラッグ。
@@ -179,23 +177,12 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             <PersonIcon fontSize="small" className="e-staff-icon" />
             <span className="e-staff-name">{staff.name}</span>
             <span className="e-staff-badges">
-              <LeaderBadges
-                rules={leaderRules}
-                staffId={staff.id}
-                onSelectRule={onSelectRule}
-              />
-              {dayOffStyle && (
-                <span
-                  className="e-day-off-style-icon"
-                  title={`休みの形：${dayOffStyle.label}。自動シフトはこの形に沿って休みを置きます`}
-                >
-                  <DayOffStyleIcon dayOffStyle={dayOffStyle} />
-                </span>
-              )}
-              {referenceReport && priority && priority.score > 0 && (
+              {profile && <ProfileMarkGroups profile={profile} onSelectRule={onSelectRule} />}
+              {priority && priority.score > 0 && (
                 <span
                   className="e-priority-badge"
-                  title={`参照レポート「${referenceReport.title}」の貢献度スコア ${priority.score}（譲歩${priority.compromiseCount}件・繁忙日${priority.busyDayCount}日）。高い人ほど自動シフトで休みを優先して取れます`}
+                  aria-label={`星${priority.score}`}
+                  title={`${schedule.period.words.previous}の確定版から引き継いだ★${priority.score}（譲歩${priority.compromiseCount}件・繁忙日${priority.busyDayCount}日）。高い人ほど自動シフトで休みを優先して取れます`}
                 >
                   ★{priority.score}
                 </span>
@@ -211,6 +198,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           tail={precedingTail}
           staffId={staff.id}
           staffName={staff.name}
+          previous={schedule.period.words.previous}
           shiftMap={shiftMap}
           className={rowMod.trim() || undefined}
           runMarks={runMarks}

@@ -12,6 +12,8 @@ import {
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleDayView, dayHeadingLabel } from "../ui/ScheduleDayView.js";
+import { DAY_NOTE_COLOR } from "../ui/schedule-grid/cellSymbols.js";
+import { rokuyoNoteOf } from "./rokuyoNote.js";
 import { useScheduleCandidates } from "./candidates/index.js";
 import { useObjects, useObject } from "../objects/repository.js";
 import { recordSetCell } from "./recordScheduleEdit.js";
@@ -22,7 +24,9 @@ import {
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
+import { wishesOfPeriod } from "./shiftWishMonths.js";
 import { useWorkingStaff } from "./workingStaff.js";
+import { staffProfileResolver } from "./staffProfile.js";
 
 type ScheduleDayDetailProps = {
   scheduleId?: string;
@@ -60,17 +64,13 @@ const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({
 
   // この勤務表と同じ年月のシフト希望を staffId 別に引けるようにする（本人の希望表示用）
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
-  const wishByStaff = useMemo(() => {
-    const map = new Map<string, StaffMonthlyShiftWish>();
-    if (schedule) {
-      for (const w of allWishes) {
-        if (w.year === schedule.year && w.month === schedule.month) {
-          map.set(w.staffId, w);
-        }
-      }
-    }
-    return map;
-  }, [allWishes, schedule]);
+  const wishByStaff = useMemo(
+    () =>
+      schedule
+        ? wishesOfPeriod(allWishes, schedule.period)
+        : new Map<string, StaffMonthlyShiftWish>(),
+    [allWishes, schedule]
+  );
 
   // まだ決まっていないセルに入れられる値（候補集合）。勤務表グリッドと同じフックを通すので、
   // ここで見える候補はグリッドの候補と一致する（計算対象も盤面全体で揃える）。
@@ -86,6 +86,17 @@ const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({
     createWorker: createCandidatesWorker,
   });
 
+  // 名前の横の記号（スタッフプロファイル）。勤務表グリッドと同じ引き方で読む
+  const profileOf = useMemo(
+    () =>
+      staffProfileResolver({
+        staffList,
+        staffGroup,
+        leaderRules,
+      }),
+    [staffList, staffGroup, leaderRules]
+  );
+
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
@@ -95,6 +106,8 @@ const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({
   // この勤務表で使える勤務帯（勤務表の WorkShiftSet。開始時刻昇順）
   const shiftOptions = workShifts;
 
+  const rokuyo = rokuyoNoteOf(day);
+
   const handleChangeCell = (staffId: string, to: ShiftCell) => {
     recordSetCell(store, { schedule, staffId, day, to });
   };
@@ -102,7 +115,19 @@ const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({
   return (
     <StyledContainer>
       <div className="e-header">
-        <h3>{dayHeadingLabel(day)}</h3>
+        <h3>
+          {dayHeadingLabel(day)}
+          {/* 六曜（#235）。日別のバブルは開いたときに読むものなので、範囲内なら常に添える */}
+          {rokuyo && (
+            <span
+              className="e-day-note"
+              title={rokuyo.title}
+              style={rokuyo.tone ? { color: DAY_NOTE_COLOR[rokuyo.tone] } : undefined}
+            >
+              {rokuyo.label}
+            </span>
+          )}
+        </h3>
       </div>
       <ScheduleDayView
         day={day}
@@ -110,6 +135,7 @@ const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({
         staffList={staffList}
         workShifts={shiftOptions}
         leaderRules={leaderRules}
+        profileOf={profileOf}
         wishByStaff={wishByStaff}
         // 再計算中は前回の（古いかもしれない）候補を出さない（グリッドと同じ扱い）
         candidates={computing ? undefined : candidates}
@@ -126,6 +152,13 @@ const StyledContainer = styled.div`
     margin-bottom: 8px;
     h3 {
       margin: 0;
+    }
+    /* 六曜。色はシンボル辞書（DAY_NOTE_COLOR）がインラインで付ける */
+    .e-day-note {
+      margin-left: 8px;
+      font-size: 0.7em;
+      font-weight: normal;
+      color: #999;
     }
   }
 `;

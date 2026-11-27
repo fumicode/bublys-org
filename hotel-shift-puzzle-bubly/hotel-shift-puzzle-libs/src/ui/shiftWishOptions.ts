@@ -4,8 +4,9 @@
  * StaffMonthlyShiftWish は「日→オプションキー→希望」の統一形でモデル化されていて、
  * オプションキーの意味（休み／各勤務帯）はこの上位層が決める。ここでキーと表示ラベルを
  * 一元管理する。
- *   - 休み          : "day-off"
- *   - 勤務帯(名前)  : "work:<勤務帯名>"
+ *   - 休み（種別なし）: "day-off"
+ *   - 休み（種別あり）: "day-off:<reason>"  （例: "day-off:年"）
+ *   - 勤務帯(名前)   : "work:<勤務帯名>"
  */
 
 import type {
@@ -23,9 +24,19 @@ export const workWishKey = (shiftName: string): string => `work:${shiftName}`;
 export const isWorkWish = (key: string): boolean => key.startsWith("work:");
 export const workWishName = (key: string): string => key.slice("work:".length);
 
+export const dayOffWishKey = (reason: string): string => `day-off:${reason}`;
+export const isDayOffWish = (key: string): boolean =>
+  key === DAY_OFF_WISH || key.startsWith("day-off:");
+export const dayOffWishReason = (key: string): string | undefined =>
+  key.startsWith("day-off:") ? key.slice("day-off:".length) : undefined;
+
 /** オプションキー → 表示ラベル */
-export const wishOptionLabel = (key: string): string =>
-  key === DAY_OFF_WISH ? "休み" : workWishName(key);
+export const wishOptionLabel = (key: string): string => {
+  if (key === DAY_OFF_WISH) return "休み";
+  const reason = dayOffWishReason(key);
+  if (reason) return reason;
+  return workWishName(key);
+};
 
 /**
  * 編集UI・凡例の列順。休み + 勤務帯名（重複名は1つにまとめる＝名前が同じなら同一勤務帯）。
@@ -94,11 +105,15 @@ export const wishMeaningOf = (
   return pref === "want" ? "この帯に入りたい" : "この帯には入れない";
 };
 
-/** その日は休み希望か */
+/** その日は休み希望か（種別なし "day-off" でも種別あり "day-off:年" でも） */
 export const isDayOffChosen = (
   wish: StaffMonthlyShiftWish,
   day: WorkingDay
-): boolean => wish.preferenceFor(day, DAY_OFF_WISH) === "want";
+): boolean => {
+  if (wish.preferenceFor(day, DAY_OFF_WISH) === "want") return true;
+  const wishes = wish.wishesOn(day);
+  return Object.keys(wishes).some((k) => isDayOffWish(k) && wishes[k] === "want");
+};
 
 /**
  * そのセルが「休み希望によって無効になっている」か（＝斜線を引くか）。
@@ -108,7 +123,7 @@ export const isBlockedByDayOff = (
   wish: StaffMonthlyShiftWish,
   day: WorkingDay,
   key: string
-): boolean => key !== DAY_OFF_WISH && isDayOffChosen(wish, day);
+): boolean => isWorkWish(key) && isDayOffChosen(wish, day);
 
 /**
  * その日「入れる勤務帯が1つも残っていない」なら、休みたい日と同じこと。

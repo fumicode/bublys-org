@@ -26,8 +26,8 @@ import type { DayOffStyle } from "../staff/DayOffStyle.js";
 export type DecodedWish =
   /** 希望なし（需要充足の候補になる） */
   | { kind: "neutral" }
-  /** 休みたい（休みに確定） */
-  | { kind: "day-off" }
+  /** 休みたい（休みに確定）。reason があれば種別つき休み（年休など） */
+  | { kind: "day-off"; reason?: string }
   /** この勤務帯に就きたい（1つだけ確定している） */
   | { kind: "work"; shiftId: string }
   /** 希望はあるが自動では決められない（触らず人間へ） */

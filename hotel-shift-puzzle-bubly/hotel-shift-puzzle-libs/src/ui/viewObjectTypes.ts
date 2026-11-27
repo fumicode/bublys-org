@@ -26,9 +26,6 @@ export const SCHEDULE_WORLD_LINE_VIEW_TYPE = "ScheduleWorldLine";
 /** キセキの木ビュー（世界線を木で描いた読み取り専用ビュー） */
 export const SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE = "ScheduleWorldLineTree";
 
-/** シフト完成レポート一覧 */
-export const SCHEDULE_REPORT_LIST_VIEW_TYPE = "ScheduleReportList";
-
 /** 数と真偽で言い切れる制約1つ（連勤・休日・休み上限・希望）。バブルで開いて直す */
 export const CONSTRAINT_LIMIT_VIEW_TYPE = "ConstraintLimit";
 
@@ -44,3 +41,6 @@ export const SHIFT_WISH_MONTH_VIEW_TYPE = "ShiftWishMonth";
  * もの。まだ一度も入力していない月は集約が存在しないが、入力表は開けるので型名は要る。
  */
 export const STAFF_SHIFT_WISH_SHEET_VIEW_TYPE = "StaffShiftWishSheet";
+
+/** Excel入出力（勤務表のインポート・エクスポート） */
+export const SHIFT_EXCEL_VIEW_TYPE = "ShiftExcel";

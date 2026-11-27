@@ -24,6 +24,7 @@ import {
 } from "../objects/hotelObjects.js";
 import { scheduleConstraintsOf } from "./scheduleConstraints.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
+import { wishesOfPeriod } from "./shiftWishMonths.js";
 import { useWorkingStaff } from "./workingStaff.js";
 
 type Props = {
@@ -47,12 +48,7 @@ const ScheduleViolationViewBody: FC<Props> = ({ scheduleId, violationKey }) => {
   // 集約から解決するので、責任者の日単位違反も同じ key で復元できる。
   const violation = useMemo(() => {
     if (!schedule) return undefined;
-    const wishByStaff = new Map<string, StaffMonthlyShiftWish>();
-    for (const w of allWishes) {
-      if (w.year === schedule.year && w.month === schedule.month) {
-        wishByStaff.set(w.staffId, w);
-      }
-    }
+    const wishByStaff = wishesOfPeriod(allWishes, schedule.period);
     return schedule
       .checkConstraints(
         scheduleConstraintsOf({ constraintSet: constraints, workShifts, wishByStaff, staffGroup })

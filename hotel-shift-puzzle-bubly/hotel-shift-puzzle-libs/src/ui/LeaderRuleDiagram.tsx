@@ -7,7 +7,7 @@ import type { Keyframes } from "styled-components";
 import { parseDragPayload } from "@bublys-org/bubbles-ui";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 import { ShiftLeaderRule, Staff } from "../domain/index.js";
-import { leaderRoleStyle } from "./LeaderBadges.js";
+import { leaderRoleStyle } from "./leaderRoleColors.js";
 import { SHIFT_BG, SHIFT_FG } from "./schedule-grid/constants.js";
 
 type LeaderRuleDiagramProps = {

@@ -6,9 +6,13 @@
  * 時間移動でその編集に戻れないことを意味するので、静かに壊れると気づけない。
  */
 import { worldLineGraphSlice } from '@bublys-org/world-line-graph';
-import { MonthlyStaffSchedule, Staff } from '@bublys-org/hotel-shift-puzzle-model';
+import { CalendarMonthPeriod, EmojiTag, MonthlyStaffSchedule, Staff } from '@bublys-org/hotel-shift-puzzle-model';
 import { registerObjects } from './framework.js';
-import { HOTEL_OBJECTS, SCHEDULE_TYPE, STAFF_TYPE } from './hotelObjects.js';
+import {
+  HOTEL_OBJECTS,
+  SCHEDULE_TYPE,
+  STAFF_TYPE,
+} from './hotelObjects.js';
 import { APP_SCOPE_ID, localScopeId, saveObject } from './commit.js';
 import { createSchedule } from '../feature/createSchedule.js';
 import { recordSetCell } from '../feature/recordScheduleEdit.js';
@@ -46,7 +50,7 @@ function setUp() {
   for (let i = 1; i <= 3; i++) {
     saveObject(store, STAFF_TYPE, new Staff({ id: `s${i}`, name: `staff${i}` }));
   }
-  const schedule = createSchedule(store, { storeId: 'st', year: 2026, month: 6 });
+  const schedule = createSchedule(store, { storeId: 'st', period: CalendarMonthPeriod.of(2026, 6) });
   const scopeId = localScopeId(SCHEDULE_TYPE, schedule.state.id);
   return { store, schedule, scopeId };
 }
@@ -119,7 +123,7 @@ describe('どの操作でどのスコープが伸びるか', () => {
 
   it('他の勤務表の世界線は伸びない（編集は自分の世界にだけ載る）', () => {
     const { store, schedule } = setUp();
-    const other = createSchedule(store, { storeId: 'st', year: 2026, month: 7 });
+    const other = createSchedule(store, { storeId: 'st', period: CalendarMonthPeriod.of(2026, 7) });
     const otherScope = localScopeId(SCHEDULE_TYPE, other.state.id);
     const before = store.counts()[otherScope];
 
@@ -163,6 +167,26 @@ describe('どの操作でどのスコープが伸びるか', () => {
     });
 
     expect(store.counts()[scopeId]).toBe(countAfterB);
+    expect(apexOf()).toBe(nodeA);
+  });
+
+  /**
+   * ★ 絵文字タグ（#236）は、何も付けていなければ保存形に書かない。
+   *   だからタグを付ける前に生まれた世界でも、付けて外せば元のノードへ戻る
+   *   （打ち消しスナップが効く）。
+   */
+  it('★ 絵文字タグを付けて外すと、元のノードへ戻る（世界線が伸びない）', () => {
+    const { store } = setUp();
+    const apexOf = () => store.getState().worldLineGraph.graphs[APP_SCOPE_ID].apexNodeId;
+    const nodeA = apexOf();
+
+    saveObject(store, STAFF_TYPE, new Staff({ id: 's1', name: 'staff1', tags: [new EmojiTag({ emoji: '🔰' })] }));
+    expect(apexOf()).not.toBe(nodeA);
+    const countAfterB = store.counts()[APP_SCOPE_ID];
+
+    saveObject(store, STAFF_TYPE, new Staff({ id: 's1', name: 'staff1' }));
+
+    expect(store.counts()[APP_SCOPE_ID]).toBe(countAfterB);
     expect(apexOf()).toBe(nodeA);
   });
 

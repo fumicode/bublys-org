@@ -21,6 +21,8 @@ export type WorkShiftState = {
   name: string;
   /** 開始時刻（0:00 からの通算分）。例: 7:00 → 420 */
   startMinute: number;
+  /** セルに表示する短縮名（"A"、"①" 等）。省略時は開始時刻の「時」を表示 */
+  shortName?: string;
   /**
    * 入力用の別名（ローマ字読みなど）。キーボードでこの勤務帯を指すときに打つ語。
    * 例: 早番 → ["hayaban", "haya"]。数字（開始時刻）や name・id は別名を書かなくても
@@ -42,12 +44,13 @@ export class WorkShift {
     id: string,
     name: string,
     start: { hour: number; minute?: number },
-    opts?: { aliases?: string[] }
+    opts?: { shortName?: string; aliases?: string[] }
   ): WorkShift {
     return new WorkShift({
       id,
       name,
       startMinute: start.hour * 60 + (start.minute ?? 0),
+      shortName: opts?.shortName,
       aliases: opts?.aliases,
     });
   }
@@ -58,6 +61,11 @@ export class WorkShift {
 
   get name(): string {
     return this.state.name;
+  }
+
+  /** セルに表示する短縮名。未設定なら undefined（開始時刻の「時」で表示する） */
+  get shortName(): string | undefined {
+    return this.state.shortName;
   }
 
   /** 入力用の別名（ローマ字読みなど）。未設定なら空配列。 */

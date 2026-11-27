@@ -7,19 +7,27 @@
  * 「作成後の評価」として世界線グラフを木のビジュアルに変換して見せるビュー。
  * ノードクリックで詳細パネルを開閉（同じノードをもう一度クリック、または
  * 閉じるボタンで閉じる）するだけで、勤務表の状態は変更しない（restore を呼ばない）。
+ * 確定版のノードには節目の旗が立つ。振り返りは振り返りバブルで見る（#231）。
  */
-import { FC, useState } from "react";
+import { FC, useMemo, useState } from "react";
 import styled from "styled-components";
 import { WorldLineTreeView } from "@bublys-org/world-line-graph";
 import { useScheduleHistory } from "./useScheduleHistory.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
+import { useConfirmedVersion } from "./confirmedVersion.js";
 
 type Props = {
   scheduleId: string;
 };
 
-const ScheduleWorldLineTreeViewBody: FC<Props> = () => {
+const ScheduleWorldLineTreeViewBody: FC<Props> = ({ scheduleId }) => {
   const { scope } = useScheduleHistory();
+  // 確定版のノードには節目の旗を立て、選ぶと詳細欄に振り返りを出す（#231）
+  const confirmed = useConfirmedVersion(scheduleId);
+  const milestones = useMemo(
+    () => new Set(confirmed ? [confirmed.worldLineNodeId] : []),
+    [confirmed]
+  );
   const getNodeLabel = (id: string) => scope.graph.state.nodes[id]?.label ?? "";
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -43,6 +51,7 @@ const ScheduleWorldLineTreeViewBody: FC<Props> = () => {
           graph={scope.graph}
           getNodeLabel={getNodeLabel}
           onSelectNode={handleSelectNode}
+          milestoneNodeIds={milestones}
         />
       </div>
       {selectedNode && (
@@ -106,6 +115,8 @@ const StyledDetailPanel = styled.div`
   right: 12px;
   bottom: 12px;
   min-width: 180px;
+  max-width: calc(100% - 24px);
+  box-sizing: border-box;
   padding: 10px 12px;
   border-radius: 8px;
   background: rgba(20, 22, 30, 0.85);
@@ -114,11 +125,11 @@ const StyledDetailPanel = styled.div`
   color: rgba(230, 235, 255, 0.92);
 
   .d-close {
-    position: absolute;
-    top: 4px;
-    right: 6px;
+    float: right;
+    margin: -6px -8px 0 4px;
     border: none;
-    background: transparent;
+    border-radius: 4px;
+    background: rgba(20, 22, 30, 0.85);
     color: rgba(230, 235, 255, 0.6);
     font-size: 1.1em;
     line-height: 1;
@@ -141,8 +152,7 @@ const StyledDetailPanel = styled.div`
   }
   .d-val {
     font-weight: 600;
-  }
-`;
+  }`;
 
 /** この勤務表の世界に入ってから木を描く */
 export const ScheduleWorldLineTreeView: FC<Props> = (props) => (

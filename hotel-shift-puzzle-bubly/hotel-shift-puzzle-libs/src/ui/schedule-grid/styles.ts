@@ -1,6 +1,7 @@
 import styled from "styled-components";
-import { EARLY_COL_WIDTH } from "./constants.js";
+import { EARLY_COL_WIDTH, STAFF_COL_WIDTH } from "./constants.js";
 import { cellFaceStyles } from "./cellFaceStyles.js";
+import { profileMarkStyles } from "../ProfileMarks.js";
 
 /**
  * グリッドの重なり順。ルールは「横・縦にスクロールする面（データセル・違反の印・
@@ -546,6 +547,13 @@ export const StyledWrap = styled.div`
       font-size: 0.8em;
       color: #888;
     }
+    /* 日付の注記（六曜など）。色は DAY_NOTE_COLOR（シンボル辞書）がインラインで付ける */
+    .e-day-note {
+      font-size: 0.65em;
+      line-height: 1.1;
+      color: #999;
+      white-space: nowrap;
+    }
 
     &.is-sun .e-day-num,
     &.is-sun .e-day-wd {
@@ -571,8 +579,36 @@ export const StyledWrap = styled.div`
     }
   }
 
+  /* 狭い表示（compact。スマホなど）: 表を読むのを優先する。
+     - 左のスタッフ列は名前だけ（人のアイコン・抽出のチェックは畳む）
+     - 右の「休」「早」の列は固定しない。左右の両方を固定すると、幅 380px ほどの画面では
+       日の列が3日ぶんしか見えない。休・早は日の列と一緒に流れ、右端までスクロールすれば読める */
+  .e-grid.is-compact {
+    .e-staff-icon,
+    .e-staff-check {
+      display: none;
+    }
+    .e-staff {
+      padding: 4px;
+    }
+    /* 左上の部署フィルタも細い列に収める */
+    .e-dept-select {
+      max-width: 52px;
+    }
+    .e-off-head,
+    .e-off-total,
+    .e-early-head,
+    .e-early-total,
+    .e-res-filler,
+    .e-res-early-filler {
+      right: auto;
+    }
+  }
+
   /* スタッフ名（左に固定）。抽出チェックボックスがあるときは横並び */
   .e-staff-cell {
+    /* 列は中身の幅（max-content）。記号が少なくてもこの幅は取る（ScheduleGridView） */
+    min-width: ${STAFF_COL_WIDTH}px;
     position: sticky;
     left: 0;
     z-index: ${Z_FIXED};
@@ -616,14 +652,17 @@ export const StyledWrap = styled.div`
       line-height: 1.15;
       font-weight: bold;
     }
-    /* 責任者バッジは名前を隠さないよう、右端に極小サイズで縦に積む */
+    /* 名前の横の記号（スタッフプロファイル）。分類を横に並べ、同じ分類の中は縦に積む
+       （ProfileMarkGroups）。★（引き継いだがんばり）はその右。名前の欄は記号の量に合わせて広がる */
     .e-staff-badges {
       flex-shrink: 0;
       display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 1px;
+      flex-direction: row;
+      align-items: center;
+      gap: 3px;
     }
+    /* スタッフプロファイルの記号（🔰・文字を囲む記号。ProfileMarks と共有） */
+    ${profileMarkStyles}
     /* 休みの形（分散／連休）のアイコン（DayOffStyleIcon）。休みが隣り合うか離れているかで見分ける */
     .e-day-off-style-icon {
       flex-shrink: 0;
@@ -631,7 +670,7 @@ export const StyledWrap = styled.div`
       cursor: help;
     }
 
-    /* 参照レポートの貢献度スコア（＝自動シフトで休みを優先する順）。参照レポートと同じ琥珀色 */
+    /* 前月の確定版から引き継いだ★（＝自動シフトで休みを優先する順）。確定版（🏁）と同じ琥珀色 */
     .e-priority-badge {
       flex-shrink: 0;
       font-size: 0.55em;

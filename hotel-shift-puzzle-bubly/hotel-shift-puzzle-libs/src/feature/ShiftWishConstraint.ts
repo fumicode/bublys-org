@@ -23,6 +23,8 @@ import {
 import {
   DAY_OFF_WISH,
   SHIFT_WISH_MISMATCH,
+  isDayOffWish,
+  dayOffWishKey,
   workWishKey,
   wishOptionLabel,
 } from "../ui/shiftWishOptions.js";
@@ -49,8 +51,8 @@ export type WishMismatch = {
  *   - 割当が「避けたい(×)」オプションに一致する          → 食い違い
  *   - 「したい(○)」が1つ以上あるのに、割当がそのどれでもない → 食い違い
  *   - その日に希望が無ければ判定しない
- * グリッドの ⊿ 判定（{@link ShiftWishConstraint}）と、シフト完成レポートの譲歩検出
- * （buildScheduleReport）の両方から呼ばれる共通ロジック。
+ * グリッドの ⊿ 判定（{@link ShiftWishConstraint}）と、振り返りの譲歩検出
+ * （buildReview）の両方から呼ばれる共通ロジック。
  */
 export function wishMismatchFor(
   day: WorkingDay,
@@ -64,8 +66,21 @@ export function wishMismatchFor(
   const wants = keys.filter((k) => wishes[k] === "want");
   const avoids = keys.filter((k) => wishes[k] === "avoid");
 
-  const violatesAvoid = avoids.includes(assignedOptionKey);
-  const violatesWant = wants.length > 0 && !wants.includes(assignedOptionKey);
+  // avoid の判定: 種別なし "day-off" の avoid は全ての休み割当に効く
+  const violatesAvoid = avoids.some((k) => {
+    if (k === assignedOptionKey) return true;
+    if (k === DAY_OFF_WISH && isDayOffWish(assignedOptionKey)) return true;
+    return false;
+  });
+  // want の充足判定:
+  //   - 完全一致（"day-off:年" want → "day-off:年" 割当）
+  //   - 種別なし "day-off" want は全ての休み割当で充足
+  const satisfiesWant = wants.some((k) => {
+    if (k === assignedOptionKey) return true;
+    if (k === DAY_OFF_WISH && isDayOffWish(assignedOptionKey)) return true;
+    return false;
+  });
+  const violatesWant = wants.length > 0 && !satisfiesWant;
   if (!violatesAvoid && !violatesWant) return null;
 
   const wishText = keys
@@ -98,7 +113,7 @@ export class ShiftWishConstraint implements ScheduleConstraint {
 
         const assigned =
           status.kind === "day-off"
-            ? DAY_OFF_WISH
+            ? (status.reason ? dayOffWishKey(status.reason) : DAY_OFF_WISH)
             : workWishKey(this.ctx.shiftNameById.get(status.shiftId) ?? status.shiftId);
 
         const mismatch = wishMismatchFor(day, wish, assigned);

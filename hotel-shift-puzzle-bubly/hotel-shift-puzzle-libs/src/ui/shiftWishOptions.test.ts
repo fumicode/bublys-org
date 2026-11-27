@@ -1,4 +1,4 @@
-import { StaffMonthlyShiftWish, WorkingDay } from '@bublys-org/hotel-shift-puzzle-model';
+import { CalendarMonthPeriod, StaffMonthlyShiftWish, WorkingDay } from '@bublys-org/hotel-shift-puzzle-model';
 import {
   DAY_OFF_WISH,
   isBlockedByDayOff,
@@ -23,7 +23,7 @@ describe('シフト希望の入力ルール（休みと勤務帯の希望は排�
     key: string
   ): StaffMonthlyShiftWish => toggleWishInput(w, day, key, OPTION_KEYS);
   const empty = () =>
-    StaffMonthlyShiftWish.create({ staffId: 'staff-A', year: 2026, month: 6 });
+    StaffMonthlyShiftWish.create({ staffId: 'staff-A', period: CalendarMonthPeriod.of(2026, 6) });
 
   describe('wishMarkOf（表示する1文字）', () => {
     test('休みは「休」・勤務帯は ×（入れない）と ○（入りたい）', () => {

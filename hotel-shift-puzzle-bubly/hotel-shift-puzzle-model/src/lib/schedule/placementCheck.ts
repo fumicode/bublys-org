@@ -117,7 +117,7 @@ const signatureOf = (projected: MonthlyStaffSchedule, projectionKey: string): st
   // 前月の末尾も違反の出方を変える（月初の連勤・遅番明け）ので、中身ごとキーに入れる
   const parts = [
     projectionKey,
-    `${projected.state.year}-${projected.state.month}`,
+    projected.period.key,
     projected.precedingTail?.signature ?? "",
   ];
   for (const a of projected.assignments) {

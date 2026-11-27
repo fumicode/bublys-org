@@ -13,10 +13,16 @@
  */
 import { registerObjectUrl } from "@bublys-org/bubbles-ui";
 import {
+  CalendarMonthPeriod,
+  SchedulePeriod,
+} from "@bublys-org/hotel-shift-puzzle-model";
+import {
   STAFF_TYPE,
   SCHEDULE_TYPE,
-  SCHEDULE_REPORT_TYPE,
 } from "@bublys-org/hotel-shift-puzzle-libs";
+
+/** 店舗一覧バブル（名前・形態・区切り方・起算日） */
+export const storeListUrl = (): string => `hotel-shift-puzzle/stores`;
 
 /** スタッフ詳細バブル */
 export const staffUrl = (staffId: string): string =>
@@ -24,25 +30,43 @@ export const staffUrl = (staffId: string): string =>
 
 /**
  * 勤務表から開いたスタッフ詳細バブル。どの勤務表から開いたかを URL で持つので、
- * 詳細にその勤務表の参照レポートでの評価が出る（スタッフ一覧から開く staffUrl には出ない）。
+ * 詳細にその勤務表の前月の振り返りが出る（スタッフ一覧から開く staffUrl には出ない）。
  * 最後の区切りが staffId なので、ここからドラッグしてもスタッフとして落とせる。
  */
 export const scheduleStaffDetailUrl = (scheduleId: string, staffId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/staffs/${staffId}`;
 
-/** シフト希望の入口。希望を集める月（＝勤務表がある月）が並ぶ月一覧 */
+/** シフト希望の入口。希望を集める期（＝勤務表がある期）が並ぶ一覧 */
 export const shiftWishListUrl = (): string => `hotel-shift-puzzle/shift-wishes`;
 
-/** その月のシフト希望一覧バブル（スタッフ全員 × 回収状況） */
-export const shiftWishMonthUrl = (year: number, month: number): string =>
-  `hotel-shift-puzzle/shift-wishes/${year}/${month}`;
+/**
+ * その期のシフト希望一覧バブル（スタッフ全員 × 回収状況）。期はキーで載せる
+ * （"2026-06" / "four-week:2026-06-07"）。
+ */
+export const shiftWishPeriodUrl = (period: SchedulePeriod): string =>
+  `hotel-shift-puzzle/shift-wishes/${period.key}`;
 
-/** スタッフ月別シフト希望の入力表バブル */
-export const staffShiftWishUrl = (
-  staffId: string,
-  year: number,
-  month: number
-): string => `hotel-shift-puzzle/staffs/${staffId}/shift-wish/${year}/${month}`;
+/** スタッフの期ごとのシフト希望の入力表バブル */
+export const staffShiftWishUrl = (staffId: string, period: SchedulePeriod): string =>
+  `hotel-shift-puzzle/staffs/${staffId}/shift-wish/${period.key}`;
+
+/**
+ * 希望のバブルの URL のパラメータから期を読む。期のキー（:periodKey）と、期を入れる前の
+ * 年月（:year/:month。保存済みのバブル配置に残っている）のどちらでも読む。読めなければ undefined。
+ */
+export const periodOfWishParams = (params: Record<string, string>): SchedulePeriod | undefined => {
+  if (params.periodKey !== undefined) return SchedulePeriod.fromKey(params.periodKey);
+  const year = Number(params.year);
+  const month = Number(params.month);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    return undefined;
+  }
+  return CalendarMonthPeriod.of(year, month);
+};
+
+/** 振り返りバブル（確定版の振り返りを独立したバブルで開く） */
+export const scheduleReviewUrl = (scheduleId: string): string =>
+  `hotel-shift-puzzle/schedules/${scheduleId}/review`;
 
 /** 月間勤務表バブル */
 export const scheduleUrl = (scheduleId: string): string =>
@@ -109,12 +133,9 @@ export const scheduleViolationUrl = (
   violationKey: string
 ): string => `hotel-shift-puzzle/schedules/${scheduleId}/violations/${violationKey}`;
 
-/** シフト完成レポートバブル（勤務表の「完成レポートを作成」から開く） */
-export const scheduleReportUrl = (reportId: string): string =>
-  `hotel-shift-puzzle/schedule-reports/${reportId}`;
-
-/** シフト完成レポート一覧バブル（次回シフト作成前の参照用。勤務表一覧から開く） */
-export const scheduleReportListUrl = (): string => `hotel-shift-puzzle/schedule-reports`;
+/** Excel入出力バブル（勤務表のインポート・エクスポート） */
+export const shiftExcelUrl = (scheduleId: string): string =>
+  `hotel-shift-puzzle/schedules/${scheduleId}/excel`;
 
 /**
  * 勤務表ファイルバブル（ローカルファイルへの保存・読み込み）。
@@ -141,4 +162,3 @@ export const modelClassDiagramUrl = (): string => `hotel-shift-puzzle/model-clas
 // import されるため、ルート登録と同じタイミングで一度だけ走る。
 registerObjectUrl(STAFF_TYPE, staffUrl);
 registerObjectUrl(SCHEDULE_TYPE, scheduleUrl);
-registerObjectUrl(SCHEDULE_REPORT_TYPE, scheduleReportUrl);

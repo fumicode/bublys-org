@@ -47,6 +47,8 @@ export type CandidateComputationInput = {
   constraints: ScheduleConstraint[];
   workShifts: WorkShift[];
   staffIds: string[];
+  /** 休み種別の reason 一覧（"年" "介護" など）。渡すと種別ごとの休み候補も加える */
+  dayOffReasons?: readonly string[];
 };
 
 /** 盤面の全未定セルについて候補集合を計算する（初期化・制約変更時） */
@@ -62,7 +64,8 @@ export function computeAllCandidates(
         input.constraints,
         staffId,
         day,
-        input.workShifts
+        input.workShifts,
+        input.dayOffReasons,
       );
     }
   }
@@ -115,7 +118,8 @@ export function recomputeCandidates(
       input.constraints,
       cell.staffId,
       cell.day,
-      input.workShifts
+      input.workShifts,
+      input.dayOffReasons,
     );
   }
 

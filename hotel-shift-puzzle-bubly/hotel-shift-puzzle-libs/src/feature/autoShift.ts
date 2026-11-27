@@ -30,6 +30,8 @@ import {
 } from "@bublys-org/hotel-shift-puzzle-model";
 import {
   DAY_OFF_WISH,
+  isDayOffWish,
+  dayOffWishReason,
   isWorkWish,
   workWishKey,
   workWishName,
@@ -65,6 +67,13 @@ export const decodeWishForStaff = (
   if (keys.length === 0) return { kind: "neutral" };
 
   if (wishes[DAY_OFF_WISH] === "want") return { kind: "day-off" };
+
+  // 種別つき休み希望（"day-off:年" など）
+  const dayOffWishKey = keys.find((k) => isDayOffWish(k) && k !== DAY_OFF_WISH && wishes[k] === "want");
+  if (dayOffWishKey) {
+    const reason = dayOffWishReason(dayOffWishKey);
+    return { kind: "day-off", reason };
+  }
 
   const wantShiftNames = keys
     .filter((k) => isWorkWish(k) && wishes[k] === "want")

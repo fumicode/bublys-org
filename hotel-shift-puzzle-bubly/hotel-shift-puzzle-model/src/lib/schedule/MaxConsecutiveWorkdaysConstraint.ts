@@ -47,7 +47,7 @@ export class MaxConsecutiveWorkdaysConstraint implements ScheduleConstraint {
       let run: WorkingDay[] = [];
       const flush = () => {
         if (run.length > 0 && carried + run.length > this.maxConsecutive) {
-          violations.push(this.toViolation(staffId, run, carried));
+          violations.push(this.toViolation(staffId, run, carried, schedule.period.words.previous));
         }
         run = [];
         carried = 0;
@@ -68,7 +68,9 @@ export class MaxConsecutiveWorkdaysConstraint implements ScheduleConstraint {
   private toViolation(
     staffId: string,
     run: WorkingDay[],
-    carried: number
+    carried: number,
+    /** 前の期の呼び方（"前月" / "前の期"）。前の期から続く連勤の文に使う */
+    previous: string
   ): ConstraintViolation {
     const total = carried + run.length;
     return new ConstraintViolation({
@@ -77,11 +79,11 @@ export class MaxConsecutiveWorkdaysConstraint implements ScheduleConstraint {
       days: run,
       message:
         carried > 0
-          ? `前月から続いて${total}連勤（上限${this.maxConsecutive}連勤）`
+          ? `${previous}から続いて${total}連勤（上限${this.maxConsecutive}連勤）`
           : `${total}連勤（上限${this.maxConsecutive}連勤）`,
       summary:
         carried > 0
-          ? `前月から${total}連勤（上限${this.maxConsecutive}）`
+          ? `${previous}から${total}連勤（上限${this.maxConsecutive}）`
           : `${total}連勤（上限${this.maxConsecutive}）`,
     });
   }

@@ -6,6 +6,7 @@ import { makeResolveAmbiguousLeaderSlotsStep } from './resolveAmbiguousLeaderSlo
 import { ShiftLeaderRule } from './ShiftLeaderRule.js';
 import { MaxConsecutiveWorkdaysConstraint } from './MaxConsecutiveWorkdaysConstraint.js';
 import type { AutoShiftContext, DecodedWish } from './autoShiftStep.js';
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 describe('makeSatisfyLeaderRulesStep（責任者制約を満たす）', () => {
   const workShifts = createDefaultWorkShifts(); // 早番 early / 中番 middle / 遅番 late
@@ -17,8 +18,7 @@ describe('makeSatisfyLeaderRulesStep（責任者制約を満たす）', () => {
     MonthlyStaffSchedule.create({
       id: 'sched-1',
       storeId: 'store-1',
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
 
   const ctxOf = (

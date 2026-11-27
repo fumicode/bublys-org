@@ -1,0 +1,94 @@
+# シフトントンのデスクトップ版（Windows / Mac / Linux）を作る。
+#
+# 手で実行する（Actions → 「シフトントン デスクトップ版」→ Run workflow）。
+# できたインストーラーは、実行結果のページの Artifacts からダウンロードする。
+# コード署名はまだしていないので、初めて開くと各 OS の警告が出る。
+#   Windows: SmartScreen の警告
+#   Mac: Gatekeeper の警告（xattr -d com.apple.quarantine で回避可能）
+name: シフトントン デスクトップ版
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 依存を入れる
+        run: npm ci
+
+      - name: インストーラーを作る
+        run: npx nx run @bublys-org/hotel-shift-puzzle-electron:package:win --skip-nx-cache
+
+      - name: インストーラーを置く
+        uses: actions/upload-artifact@v4
+        with:
+          name: shiftonton-windows
+          path: hotel-shift-puzzle-bubly/hotel-shift-puzzle-electron/release/*.exe
+          if-no-files-found: error
+          retention-days: 30
+
+  build-mac:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 依存を入れる
+        run: npm ci
+
+      - name: インストーラーを作る
+        run: npx nx run @bublys-org/hotel-shift-puzzle-electron:package:mac --skip-nx-cache
+
+      - name: インストーラーを置く
+        uses: actions/upload-artifact@v4
+        with:
+          name: shiftonton-mac
+          path: hotel-shift-puzzle-bubly/hotel-shift-puzzle-electron/release/*.dmg
+          if-no-files-found: error
+          retention-days: 30
+
+  build-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 依存を入れる
+        run: npm ci
+
+      - name: インストーラーを作る
+        run: npx nx run @bublys-org/hotel-shift-puzzle-electron:package:linux --skip-nx-cache
+
+      - name: インストーラーを置く
+        uses: actions/upload-artifact@v4
+        with:
+          name: shiftonton-linux
+          path: hotel-shift-puzzle-bubly/hotel-shift-puzzle-electron/release/*.AppImage
+          if-no-files-found: error
+          retention-days: 30

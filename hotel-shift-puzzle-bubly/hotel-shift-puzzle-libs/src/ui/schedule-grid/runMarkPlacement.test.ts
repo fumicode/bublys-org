@@ -1,4 +1,5 @@
 import {
+  CalendarMonthPeriod,
   MonthlyStaffSchedule,
   PrecedingMonthTail,
   WorkingDay,
@@ -15,8 +16,7 @@ describe("runMarksOf — 連勤・連休の線の置き場所", () => {
     let s = MonthlyStaffSchedule.create({
       id: "sched-1",
       storeId: "store-1",
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
     [...row].forEach((c, i) => {
       if (c === "W") s = s.assignShift("s1", day(i + 1), "early");
@@ -73,17 +73,18 @@ describe("runMarksOf — 連勤・連休の線の置き場所", () => {
   describe("前月の末尾とつなぐ", () => {
     /** 前月（5月）の末尾を "OWWW" のような文字列で（最後が 5/31） */
     const tailOf = (row: string) => {
-      let may = MonthlyStaffSchedule.create({ id: "may", storeId: "store-1", year: 2026, month: 5 });
+      let may = MonthlyStaffSchedule.create({ id: "may", storeId: "store-1", period: CalendarMonthPeriod.of(2026, 5) });
       [...row].forEach((c, i) => {
         const d = WorkingDay.of(2026, 5, 31 - row.length + 1 + i);
         if (c === "W") may = may.assignShift("s1", d, "early");
         if (c === "O") may = may.assignDayOff("s1", d);
       });
       return PrecedingMonthTail.capture({
-        sourceReportId: "may:1",
+        source: { scheduleId: "may", worldLineNodeId: "node-1" },
         schedule: may,
         shiftNameOf: () => "早番",
         length: row.length,
+        stars: [],
       });
     };
     const withTail = (tail: string, row: string) =>

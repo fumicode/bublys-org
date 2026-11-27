@@ -11,6 +11,7 @@ import {
   hotelCellRole,
   ModelClassDiagram,
   hotelNestedScope,
+  StoreCollection,
   StaffCollection,
   StaffDetail,
   WorkShiftCollection,
@@ -23,6 +24,7 @@ import {
   ScheduleReservationInfoDetail,
   ExtractedSchedule,
   HotelObjectsProvider,
+  ConfirmedReviewPanel,
   ScheduleWorldLineView,
   ScheduleWorldLineTreeView,
   WorkingStaffPanel,
@@ -32,10 +34,10 @@ import {
   ShiftWishStaffList,
   LeaderRuleView,
   ShiftIntervalRuleView,
-  ScheduleReportPanel,
-  ScheduleReportList,
   WorldFilePanel,
+  ShiftExcelPanel,
 } from "@bublys-org/hotel-shift-puzzle-libs";
+import { availablePeriodRuleKinds, availableStoreFormats } from "./storeFormats.js";
 // バブル URL スキーム（app 層で一元管理）。import すると同時にオブジェクト URL の
 // registerObjectUrl 副作用も走る。
 import {
@@ -45,12 +47,14 @@ import {
   scheduleReservationInfoUrl,
   scheduleWorldLineUrl,
   constraintBubbleUrlOf,
-  scheduleReportUrl,
-  scheduleReportListUrl,
   scheduleWorldLineTreeUrl,
   staffShiftWishUrl,
-  shiftWishMonthUrl,
+  shiftWishPeriodUrl,
+  periodOfWishParams,
   scheduleStaffDetailUrl,
+  scheduleReviewUrl,
+  scheduleUrl,
+  shiftExcelUrl,
 } from "./bubbleUrls.js";
 
 // 全バブルは統一リポジトリ（アプリ全体の世界線スコープ）にアクセスするため、
@@ -60,6 +64,12 @@ const withObjects = (node: ReactNode) => (
 );
 
 // --- スタッフ一覧バブル ---
+// --- 店舗一覧バブル（勤務表の外のデータ。選べる形態・区切り方はデプロイが決める） ---
+const StoreListBubble: BubbleRoute["Component"] = () =>
+  withObjects(
+    <StoreCollection formats={availableStoreFormats} ruleKinds={availablePeriodRuleKinds} />
+  );
+
 const StaffListBubble: BubbleRoute["Component"] = () => withObjects(<StaffCollection />);
 
 // --- スタッフ詳細バブル ---
@@ -68,56 +78,57 @@ const StaffDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return withObjects(
     <StaffDetail
       staffId={staffId}
-      shiftWishUrl={(year, month) => staffShiftWishUrl(staffId, year, month)}
+      shiftWishUrl={(period) => staffShiftWishUrl(staffId, period)}
     />
   );
 };
 
-// --- 勤務表から開いたスタッフ詳細バブル（その勤務表の参照レポートでの評価も出す） ---
+// --- 勤務表から開いたスタッフ詳細バブル（その勤務表の前月の振り返りも出す） ---
 const ScheduleStaffDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { staffId, scheduleId } = bubble.params;
   return withObjects(
     <StaffDetail
       staffId={staffId}
       scheduleId={scheduleId}
-      shiftWishUrl={(year, month) => staffShiftWishUrl(staffId, year, month)}
+      shiftWishUrl={(period) => staffShiftWishUrl(staffId, period)}
     />
   );
 };
 
-// --- シフト希望の入口バブル（希望を集める月が並ぶ） ---
+// --- シフト希望の入口バブル（希望を集める期が並ぶ） ---
 const ShiftWishListBubble: BubbleRoute["Component"] = () =>
-  withObjects(<ShiftWishMonthList monthUrl={shiftWishMonthUrl} />);
+  withObjects(<ShiftWishMonthList periodUrl={shiftWishPeriodUrl} />);
 
-// --- その月のシフト希望一覧バブル（スタッフ全員 × 回収状況） ---
-// 対象の月は URL（:year/:month）で決まる。別の月・別の人は、それぞれ別のバブルとして開く。
+const invalidPeriod = (
+  <div style={{ padding: 16, color: "#666" }}>期の指定が正しくありません</div>
+);
+
+// --- その期のシフト希望一覧バブル（スタッフ全員 × 回収状況） ---
+// 対象の期は URL（期のキー、または期を入れる前の :year/:month）で決まる。
+// 別の期・別の人は、それぞれ別のバブルとして開く。
 const ShiftWishMonthBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  const year = Number(bubble.params.year);
-  const month = Number(bubble.params.month);
-  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
-    return <div style={{ padding: 16, color: "#666" }}>月の指定が正しくありません</div>;
-  }
+  const period = periodOfWishParams(bubble.params);
+  if (!period) return invalidPeriod;
   return withObjects(
     <ShiftWishStaffList
-      year={year}
-      month={month}
-      wishUrl={(staffId) => staffShiftWishUrl(staffId, year, month)}
+      period={period}
+      wishUrl={(staffId) => staffShiftWishUrl(staffId, period)}
     />
   );
 };
 
-// --- スタッフ月別シフト希望エディタバブル ---
-const ShiftWishBubble: BubbleRoute["Component"] = ({ bubble }) =>
-  withObjects(
-    <ShiftWishEditor
-      staffId={bubble.params.staffId}
-      year={Number(bubble.params.year)}
-      month={Number(bubble.params.month)}
-    />
+// --- スタッフの期ごとのシフト希望エディタバブル ---
+const ShiftWishBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const period = periodOfWishParams(bubble.params);
+  if (!period) return invalidPeriod;
+  return withObjects(
+    <ShiftWishEditor staffId={bubble.params.staffId} period={period} formatId={availableStoreFormats[0].id} />
   );
+};
 
 // --- 勤務帯リストバブル（リスト内で追加・編集） ---
-const WorkShiftListBubble: BubbleRoute["Component"] = () => withObjects(<WorkShiftCollection />);
+const WorkShiftListBubble: BubbleRoute["Component"] = () =>
+  withObjects(<WorkShiftCollection formatId={availableStoreFormats[0].id} />);
 
 // --- 制約セットバブル（グローバルのテンプレート。勤務表作成時にコピーされる） ---
 const ConstraintSetBubble: BubbleRoute["Component"] = () =>
@@ -130,9 +141,8 @@ const ConstraintSetBubble: BubbleRoute["Component"] = () =>
   );
 
 // --- 勤務表一覧バブル（複数の勤務表を作成・管理） ---
-// 「シフト完成レポート一覧」から過去レポートを参照できる（次回シフト作成前の参考用）。
 const ScheduleListBubble: BubbleRoute["Component"] = () =>
-  withObjects(<ScheduleCollection reportListUrl={scheduleReportListUrl()} />);
+  withObjects(<ScheduleCollection formats={availableStoreFormats} />);
 
 /**
  * 候補集合の計算 worker を作る。worker の作り方（new Worker + import.meta.url）は
@@ -145,9 +155,8 @@ const createCandidatesWorker = () =>
   });
 
 // --- 月間スタッフ勤務表バブル（グリッド + 可能勤務帯 / 世界線 / 自動シフトへのリンク） ---
-// キセキの木と完成レポートは、それぞれ独立したボタンから勤務表バブルを opener にして
-// 別々に開く（bubble-ui は2つのバブルを連動して横並び配置するのが難しいため、
-// チェイン opener はやめてどちらも単独開きにしている）。
+// 世界線ビュー・キセキの木・振り返りは、それぞれ独立したボタンから勤務表バブルを opener にして
+// 単独で開く。振り返りは ScheduleReviewBubble で独立バブルとして開く（#231）。
 const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble, isOpen, bringToFront } = useContext(BubblesContext);
   const scheduleId = bubble.params.scheduleId;
@@ -162,6 +171,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   // 抽出はクリックした要素（バッジ／抽出ボタン）の近くに出したいので origin-side で開く
   const openOrigin = (url: string) => openBubble(url, bubble.id, "origin-side");
   const treeUrl = scheduleWorldLineTreeUrl(scheduleId);
+  const rvUrl = scheduleReviewUrl(scheduleId);
   // 世界線ビューは勤務表に1つあれば足りる。すでに開いていれば新しく開かず、最前面へ出す
   // （何も起きないと押した手応えが無い）。解決案生成のあとの自動展開も、
   // ボタンのダブルクリックも、この1箇所を通る。
@@ -176,13 +186,11 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
     <ScheduleGrid
       scheduleId={scheduleId}
       onOpenWorldLine={openWorldLine}
-      onConfirm={(reportId) => openSide(scheduleReportUrl(reportId), "bubble-side-bottom")}
       workingStaffUrl={workingStaffUrl}
-      shiftWishesUrl={shiftWishMonthUrl}
+      shiftWishesUrl={shiftWishPeriodUrl}
       worldLineUrl={worldLineUrl}
       treeUrl={treeUrl}
       bubbleUrlOf={(kind, key) => constraintBubbleUrlOf(scheduleId, kind, key)}
-      reportBubbleUrl={scheduleReportUrl}
       staffBubbleUrl={(staffId) => scheduleStaffDetailUrl(scheduleId, staffId)}
       onOpenRule={(ruleKey) =>
         openOrigin(constraintBubbleUrlOf(scheduleId, "leaderRule", ruleKey))
@@ -192,8 +200,20 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
         scheduleViolationUrl(scheduleId, violationKey)
       }
       reservationInfoUrl={scheduleReservationInfoUrl(scheduleId)}
+      shiftExcelUrl={availableStoreFormats.some(f => f.id === "government") ? shiftExcelUrl(scheduleId) : undefined}
       createCandidatesWorker={createCandidatesWorker}
+      reviewUrl={rvUrl}
+      onOpenReview={() => openSide(rvUrl, "bubble-side-right")}
+      precedingReviewUrl={scheduleReviewUrl}
     />
+  );
+};
+
+// --- 振り返りバブル（確定版の振り返りを独立したバブルとして開く） ---
+const ScheduleReviewBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const sid = bubble.params.scheduleId;
+  return withObjects(
+    <ConfirmedReviewPanel scheduleId={sid} scheduleUrl={scheduleUrl(sid)} />
   );
 };
 
@@ -207,9 +227,6 @@ const ExtractedScheduleBubble: BubbleRoute["Component"] = ({ bubble }) =>
     <ExtractedSchedule
       scheduleId={bubble.params.scheduleId}
       staffIds={(bubble.params.staffIds ?? "").split(",").filter(Boolean)}
-      staffBubbleUrl={(staffId) =>
-        scheduleStaffDetailUrl(bubble.params.scheduleId, staffId)
-      }
     />
   );
 
@@ -239,14 +256,6 @@ const ScheduleViolationBubble: BubbleRoute["Component"] = ({ bubble }) =>
 // --- 勤務表の世界線ビューバブル（canvas版） ---
 const ScheduleWorldLineBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<ScheduleWorldLineView scheduleId={bubble.params.scheduleId} />);
-
-// --- シフト完成レポートバブル（勤務表の「完成レポートを作成」から開く） ---
-const ScheduleReportBubble: BubbleRoute["Component"] = ({ bubble }) =>
-  withObjects(<ScheduleReportPanel reportId={bubble.params.reportId} />);
-
-// --- シフト完成レポート一覧バブル（勤務表一覧の「シフト完成レポート一覧」から開く） ---
-const ScheduleReportListBubble: BubbleRoute["Component"] = () =>
-  withObjects(<ScheduleReportList />);
 
 // --- 勤務表のキセキの木ビューバブル（SVG版・読み取り専用） ---
 const ScheduleWorldLineTreeBubble: BubbleRoute["Component"] = ({ bubble }) =>
@@ -299,9 +308,14 @@ const LegacyScheduleShiftIntervalRuleBubble: BubbleRoute["Component"] = ({
     />
   );
 
+// --- Excel入出力バブル（勤務表のインポート・エクスポート） ---
+const ShiftExcelBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<ShiftExcelPanel scheduleId={bubble.params.scheduleId} />);
+
 // --- 勤務表ファイルバブル（世界線ごとローカルファイルへ保存・読み込み） ---
 // 世界全体を扱うので勤務表 ID は取らない。Provider 配下に置くのは他バブルと同じ。
-const WorldFileBubble: BubbleRoute["Component"] = () => withObjects(<WorldFilePanel />);
+const WorldFileBubble: BubbleRoute["Component"] = () =>
+  withObjects(<WorldFilePanel formats={availableStoreFormats} />);
 
 // --- 世界線インスペクタ（デバッグ用） ---
 // 読み取り専用。Provider は要らない（Redux と IndexedDB を直接覗くだけ）が、
@@ -333,10 +347,14 @@ const ModelClassDiagramBubble: BubbleRoute["Component"] = () =>
 
 /** このバブリのバブルルート定義 */
 export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
+  // 希望のバブルは期のキーで開く。:year/:month は期を入れる前の URL（保存済みの配置に残っている）
+  { pattern: "hotel-shift-puzzle/staffs/:staffId/shift-wish/:periodKey", type: "staff-shift-wish", Component: ShiftWishBubble },
   { pattern: "hotel-shift-puzzle/staffs/:staffId/shift-wish/:year/:month", type: "staff-shift-wish", Component: ShiftWishBubble },
+  { pattern: "hotel-shift-puzzle/shift-wishes/:periodKey", type: "shift-wish-month", Component: ShiftWishMonthBubble },
   { pattern: "hotel-shift-puzzle/shift-wishes/:year/:month", type: "shift-wish-month", Component: ShiftWishMonthBubble },
   { pattern: "hotel-shift-puzzle/shift-wishes", type: "shift-wish-list", Component: ShiftWishListBubble },
   { pattern: "hotel-shift-puzzle/staffs/:staffId", type: "staff", Component: StaffDetailBubble },
+  { pattern: "hotel-shift-puzzle/stores", type: "store-list", Component: StoreListBubble },
   { pattern: "hotel-shift-puzzle/staffs", type: "staff-list", Component: StaffListBubble },
   { pattern: "hotel-shift-puzzle/work-shifts", type: "work-shift-list", Component: WorkShiftListBubble },
   // 制約1つぶんのバブル。具体的な pattern を先に置く（constraints 単体より上）
@@ -344,6 +362,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/constraints/:constraintSetId/leader-rules/:ruleKey", type: "constraint-leader-rule", Component: LeaderRuleBubble },
   { pattern: "hotel-shift-puzzle/constraints/:constraintSetId/shift-interval-rules/:ruleKey", type: "constraint-shift-interval-rule", Component: ShiftIntervalRuleBubble },
   { pattern: "hotel-shift-puzzle/constraints", type: "constraint-set", Component: ConstraintSetBubble, bubbleOptions: { defaultSize: { width: 760, height: 460 } } },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/excel", type: "shift-excel", Component: ShiftExcelBubble, bubbleOptions: { defaultSize: { width: 400, height: 380 } } },
   { pattern: "hotel-shift-puzzle/file", type: "world-file", Component: WorldFileBubble },
   // インスペクタは表が詰まっているので、窓型（fillsContainer）で大きめに開く
   { pattern: "hotel-shift-puzzle/world-line-inspector", type: "world-line-inspector", Component: WorldLineInspectorBubble, bubbleOptions: { fillsContainer: true, defaultSize: { width: 900, height: 600 } } },
@@ -365,6 +384,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/staff", type: "schedule-staff", Component: WorkingStaffBubble, bubbleOptions: { defaultSize: { width: 620, height: 440 } } },
   // 抽出バブルはフロストガラス調：背景を半透明にして裏がうっすら見えるようにする（ぼかしは中で付与）
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/extract/:staffIds", type: "schedule-extract", Component: ExtractedScheduleBubble, bubbleOptions: { contentBackground: "hsla(0, 0%, 100%, 0.5)" } },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/review", type: "schedule-review", Component: ScheduleReviewBubble, bubbleOptions: { defaultSize: { width: 600, height: 500 } } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/violations/:violationKey", type: "schedule-violation", Component: ScheduleViolationBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/days/:dayKey", type: "schedule-day", Component: ScheduleDayBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/reservation-info", type: "schedule-reservation-info", Component: ScheduleReservationInfoBubble },
@@ -372,8 +392,4 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   // 画面に入らない分は、開くときに見えている範囲まで縮む（Bubble.fitInto）
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId", type: "schedule", Component: ScheduleBubble, bubbleOptions: { defaultSize: { width: 1560, height: 1100 } } },
   { pattern: "hotel-shift-puzzle/schedules", type: "schedule-list", Component: ScheduleListBubble },
-  // シフト完成レポート（#86〜#89）。list は `/schedule-reports`、単体は `/schedule-reports/:reportId`
-  // （schedules/schedule-list と同じ命名パターン）。
-  { pattern: "hotel-shift-puzzle/schedule-reports/:reportId", type: "schedule-report", Component: ScheduleReportBubble },
-  { pattern: "hotel-shift-puzzle/schedule-reports", type: "schedule-report-list", Component: ScheduleReportListBubble },
 ];

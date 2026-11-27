@@ -36,6 +36,303 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "CalendarMonthPeriod",
+      "file": "schedule/SchedulePeriod.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "year",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "month",
+          "type": "number",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "year",
+        "month",
+        "start",
+        "key",
+        "length",
+        "label",
+        "words"
+      ],
+      "methods": [
+        {
+          "name": "of",
+          "params": [
+            "year",
+            "month"
+          ],
+          "returns": "CalendarMonthPeriod",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "previous",
+          "params": [],
+          "returns": "CalendarMonthPeriod",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "next",
+          "params": [],
+          "returns": "CalendarMonthPeriod",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "SchedulePeriodPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ],
+      "doc": "暦月の期：起点は毎月1日、長さはその月の日数"
+    },
+    {
+      "name": "CalendarMonthRule",
+      "file": "store/PeriodRule.ts",
+      "kind": "value",
+      "fields": [],
+      "getters": [
+        "label"
+      ],
+      "methods": [
+        {
+          "name": "periodContaining",
+          "params": [
+            "day"
+          ],
+          "returns": "SchedulePeriod",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "PeriodRulePlain",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ],
+      "doc": "暦月：毎月1日から月末まで"
+    },
+    {
+      "name": "ConfirmedSchedule",
+      "file": "schedule/ConfirmedSchedule.ts",
+      "kind": "aggregate",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "scheduleId",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "worldLineNodeId",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "period",
+          "type": "SchedulePeriod",
+          "optional": false
+        },
+        {
+          "name": "storeId",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "compromises",
+          "type": "CompromiseEntry[]",
+          "optional": false
+        },
+        {
+          "name": "busyDayContributions",
+          "type": "BusyDayEntry[]",
+          "optional": false
+        },
+        {
+          "name": "stars",
+          "type": "StarEntry[]",
+          "optional": false
+        },
+        {
+          "name": "considerationNotes",
+          "type": "Record<string, string>",
+          "optional": false
+        },
+        {
+          "name": "compromiseWeight",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "busyDayWeight",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "confirmedAt",
+          "type": "number",
+          "optional": true
+        }
+      ],
+      "getters": [
+        "id",
+        "version",
+        "scheduleId",
+        "worldLineNodeId",
+        "period",
+        "storeId",
+        "title",
+        "confirmedAt",
+        "compromises",
+        "busyDayContributions",
+        "stars",
+        "compromiseWeight",
+        "busyDayWeight",
+        "considerationNotes"
+      ],
+      "methods": [
+        {
+          "name": "idFor",
+          "params": [
+            "storeId",
+            "period"
+          ],
+          "returns": "string",
+          "isStatic": true,
+          "returnsSelf": false
+        },
+        {
+          "name": "precedingIdFor",
+          "params": [
+            "target"
+          ],
+          "returns": "string",
+          "isStatic": true,
+          "returnsSelf": false
+        },
+        {
+          "name": "defaultTitle",
+          "params": [
+            "period"
+          ],
+          "returns": "string",
+          "isStatic": true,
+          "returnsSelf": false
+        },
+        {
+          "name": "create",
+          "params": [
+            "params"
+          ],
+          "returns": "ConfirmedSchedule",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "confirm",
+          "params": [
+            "params",
+            "current"
+          ],
+          "returns": "ConfirmedSchedule",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "isVersion",
+          "params": [
+            "version"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "rename",
+          "params": [
+            "title"
+          ],
+          "returns": "ConfirmedSchedule",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "starsOf",
+          "params": [
+            "staffId"
+          ],
+          "returns": "number",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "reweight",
+          "params": [
+            "compromiseWeight",
+            "busyDayWeight"
+          ],
+          "returns": "ConfirmedSchedule",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "noteFor",
+          "params": [
+            "staffId"
+          ],
+          "returns": "string",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "setNote",
+          "params": [
+            "staffId",
+            "text"
+          ],
+          "returns": "ConfirmedSchedule",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "ConfirmedSchedulePlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "ConfirmedSchedule",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
       "name": "ConstraintDelta",
       "file": "schedule/ConstraintDelta.ts",
       "kind": "value",
@@ -114,11 +411,6 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": true
         },
         {
-          "name": "linkedReportId",
-          "type": "string",
-          "optional": true
-        },
-        {
           "name": "useReportPriority",
           "type": "boolean",
           "optional": true
@@ -127,13 +419,12 @@ export const MODEL_GRAPH: ModelGraph = {
       "getters": [
         "id",
         "maxConsecutiveWorkdays",
-        "useReportPriority",
+        "useStarPriority",
         "checkShiftWish",
         "checkAllowedShift",
         "minMonthlyDayOff",
         "maxDayOffPerDay",
         "shiftIntervalRules",
-        "linkedReportId",
         "leaderRules"
       ],
       "methods": [
@@ -219,27 +510,9 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": true
         },
         {
-          "name": "withUseReportPriority",
+          "name": "withUseStarPriority",
           "params": [
             "use"
-          ],
-          "returns": "ConstraintSet",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "linkReport",
-          "params": [
-            "reportId"
-          ],
-          "returns": "ConstraintSet",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "unlinkReport",
-          "params": [
-            "reportId"
           ],
           "returns": "ConstraintSet",
           "isStatic": false,
@@ -630,6 +903,258 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "DayOffType",
+      "file": "schedule/DayOffType.ts",
+      "kind": "part",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "shortName",
+          "type": "string",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "id",
+        "name",
+        "shortName"
+      ],
+      "methods": [
+        {
+          "name": "of",
+          "params": [
+            "id",
+            "name",
+            "shortName"
+          ],
+          "returns": "DayOffType",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "DayOffTypeSet",
+      "file": "schedule/DayOffTypeSet.ts",
+      "kind": "part",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "types",
+          "type": "DayOffType[]",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "id",
+        "types"
+      ],
+      "methods": [
+        {
+          "name": "of",
+          "params": [
+            "id",
+            "types"
+          ],
+          "returns": "DayOffTypeSet",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "find",
+          "params": [
+            "typeId"
+          ],
+          "returns": "DayOffType | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "withId",
+          "params": [
+            "newId"
+          ],
+          "returns": "DayOffTypeSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "DayOffTypeSetPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "DayOffTypeSet",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "EmojiTag",
+      "file": "staff/EmojiTag.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "emoji",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "optional": true
+        }
+      ],
+      "getters": [
+        "emoji",
+        "label"
+      ],
+      "methods": [
+        {
+          "name": "withLabel",
+          "params": [
+            "label"
+          ],
+          "returns": "EmojiTag",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "sameEmoji",
+          "params": [
+            "other"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "EmojiTagState",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "EmojiTag",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "FourWeekPeriod",
+      "file": "schedule/SchedulePeriod.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "start",
+          "type": "WorkingDay",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "start",
+        "key",
+        "length",
+        "label",
+        "words"
+      ],
+      "methods": [
+        {
+          "name": "containing",
+          "params": [
+            "anchor",
+            "day"
+          ],
+          "returns": "FourWeekPeriod",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "previous",
+          "params": [],
+          "returns": "FourWeekPeriod",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "next",
+          "params": [],
+          "returns": "FourWeekPeriod",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "SchedulePeriodPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ],
+      "doc": "4週の期：起点日から28日"
+    },
+    {
+      "name": "FourWeekRule",
+      "file": "store/PeriodRule.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "anchor",
+          "type": "WorkingDay",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "anchor",
+        "label"
+      ],
+      "methods": [
+        {
+          "name": "periodContaining",
+          "params": [
+            "day"
+          ],
+          "returns": "SchedulePeriod",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "PeriodRulePlain",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ],
+      "doc": "4週：起算日から4週ずつ"
+    },
+    {
       "name": "MaxConsecutiveWorkdaysConstraint",
       "file": "schedule/MaxConsecutiveWorkdaysConstraint.ts",
       "kind": "value",
@@ -720,13 +1245,8 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": false
         },
         {
-          "name": "year",
-          "type": "number",
-          "optional": false
-        },
-        {
-          "name": "month",
-          "type": "number",
+          "name": "period",
+          "type": "SchedulePeriod",
           "optional": false
         },
         {
@@ -758,8 +1278,7 @@ export const MODEL_GRAPH: ModelGraph = {
       "getters": [
         "id",
         "storeId",
-        "year",
-        "month",
+        "period",
         "workingStaffGroupId",
         "constraintSetId",
         "precedingTail",
@@ -776,13 +1295,6 @@ export const MODEL_GRAPH: ModelGraph = {
           "returns": "MonthlyStaffSchedule",
           "isStatic": true,
           "returnsSelf": true
-        },
-        {
-          "name": "previousYearMonth",
-          "params": [],
-          "returns": "{ year: number; month: number; }",
-          "isStatic": false,
-          "returnsSelf": false
         },
         {
           "name": "withPrecedingTail",
@@ -825,7 +1337,8 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "assignDayOff",
           "params": [
             "staffId",
-            "day"
+            "day",
+            "reason"
           ],
           "returns": "MonthlyStaffSchedule",
           "isStatic": false,
@@ -1035,6 +1548,78 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "PeriodRule",
+      "file": "store/PeriodRule.ts",
+      "kind": "value",
+      "fields": [],
+      "getters": [
+        "label"
+      ],
+      "methods": [
+        {
+          "name": "periodContaining",
+          "params": [
+            "day"
+          ],
+          "returns": "SchedulePeriod",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "PeriodRulePlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "periodsAround",
+          "params": [
+            "day",
+            "before",
+            "after"
+          ],
+          "returns": "SchedulePeriod[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "equals",
+          "params": [
+            "other"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "calendarMonth",
+          "params": [],
+          "returns": "CalendarMonthRule",
+          "isStatic": true,
+          "returnsSelf": false
+        },
+        {
+          "name": "fourWeek",
+          "params": [
+            "anchor"
+          ],
+          "returns": "FourWeekRule",
+          "isStatic": true,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "PeriodRule",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
       "name": "PrecedingCell",
       "file": "schedule/PrecedingMonthTail.ts",
       "kind": "value",
@@ -1088,8 +1673,8 @@ export const MODEL_GRAPH: ModelGraph = {
       "kind": "value",
       "fields": [
         {
-          "name": "sourceReportId",
-          "type": "string",
+          "name": "source",
+          "type": "ConfirmedVersion",
           "optional": false
         },
         {
@@ -1106,14 +1691,19 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "cells",
           "type": "PrecedingCell[]",
           "optional": false
+        },
+        {
+          "name": "stars",
+          "type": "StarEntry[]",
+          "optional": true
         }
       ],
       "getters": [
-        "sourceReportId",
+        "source",
+        "stars",
         "confirmedAt",
         "days",
         "lastDay",
-        "yearMonth",
         "signature"
       ],
       "methods": [
@@ -1127,10 +1717,18 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": true
         },
         {
+          "name": "starsOf",
+          "params": [
+            "staffId"
+          ],
+          "returns": "number",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
           "name": "directlyPrecedes",
           "params": [
-            "year",
-            "month"
+            "period"
           ],
           "returns": "boolean",
           "isStatic": false,
@@ -1195,6 +1793,295 @@ export const MODEL_GRAPH: ModelGraph = {
             "plain"
           ],
           "returns": "PrecedingMonthTail",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "ProfileItem",
+      "file": "staff/StaffProfileDictionary.ts",
+      "kind": "part",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "category",
+          "type": "\"basic\" | \"role\" | \"ability\" | \"workStyle\" | \"status\"",
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "choice",
+          "type": "ProfileChoice",
+          "optional": false
+        },
+        {
+          "name": "values",
+          "type": "ProfileValue[]",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "id",
+        "category",
+        "name",
+        "choice",
+        "values"
+      ],
+      "methods": [
+        {
+          "name": "value",
+          "params": [
+            "valueId"
+          ],
+          "returns": "ProfileValue | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "resolve",
+          "params": [
+            "valueIds"
+          ],
+          "returns": "ProfileValue[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "rename",
+          "params": [
+            "name"
+          ],
+          "returns": "ProfileItem",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withCategory",
+          "params": [
+            "category"
+          ],
+          "returns": "ProfileItem",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withChoice",
+          "params": [
+            "choice"
+          ],
+          "returns": "ProfileItem",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "addValue",
+          "params": [
+            "value"
+          ],
+          "returns": "ProfileItem",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "updateValue",
+          "params": [
+            "valueId",
+            "fn"
+          ],
+          "returns": "ProfileItem",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "removeValue",
+          "params": [
+            "valueId"
+          ],
+          "returns": "ProfileItem",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "ProfileItemPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "ProfileItem",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "ProfileSelection",
+      "file": "staff/ProfileSelection.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "entries",
+          "type": "ProfileSelectionEntry[]",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "entries",
+        "isEmpty"
+      ],
+      "methods": [
+        {
+          "name": "has",
+          "params": [
+            "itemId"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "valueIdsOf",
+          "params": [
+            "itemId"
+          ],
+          "returns": "readonly string[] | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "set",
+          "params": [
+            "itemId",
+            "valueIds"
+          ],
+          "returns": "ProfileSelection",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "clear",
+          "params": [
+            "itemId"
+          ],
+          "returns": "ProfileSelection",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "equals",
+          "params": [
+            "other"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "ProfileSelectionPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "ProfileSelection",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "ProfileValue",
+      "file": "staff/StaffProfileDictionary.ts",
+      "kind": "part",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "symbol",
+          "type": "string",
+          "optional": true
+        },
+        {
+          "name": "mark",
+          "type": "ProfileMarkStyle",
+          "optional": true
+        }
+      ],
+      "getters": [
+        "id",
+        "label",
+        "symbol",
+        "markStyle",
+        "markText"
+      ],
+      "methods": [
+        {
+          "name": "withMarkStyle",
+          "params": [
+            "style"
+          ],
+          "returns": "ProfileValue",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withLabel",
+          "params": [
+            "label"
+          ],
+          "returns": "ProfileValue",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withSymbol",
+          "params": [
+            "symbol"
+          ],
+          "returns": "ProfileValue",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "ProfileValueState",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "ProfileValue",
           "isStatic": true,
           "returnsSelf": true
         }
@@ -1443,197 +2330,81 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
-      "name": "ScheduleReport",
-      "file": "schedule/ScheduleReport.ts",
-      "kind": "aggregate",
-      "fields": [
-        {
-          "name": "id",
-          "type": "string",
-          "optional": false
-        },
-        {
-          "name": "scheduleId",
-          "type": "string",
-          "optional": false
-        },
-        {
-          "name": "worldLineNodeId",
-          "type": "string",
-          "optional": false
-        },
-        {
-          "name": "year",
-          "type": "number",
-          "optional": false
-        },
-        {
-          "name": "month",
-          "type": "number",
-          "optional": false
-        },
-        {
-          "name": "storeId",
-          "type": "string",
-          "optional": false
-        },
-        {
-          "name": "title",
-          "type": "string",
-          "optional": false
-        },
-        {
-          "name": "compromises",
-          "type": "CompromiseEntry[]",
-          "optional": false
-        },
-        {
-          "name": "busyDayContributions",
-          "type": "BusyDayEntry[]",
-          "optional": false
-        },
-        {
-          "name": "contributionScores",
-          "type": "ContributionScoreEntry[]",
-          "optional": false
-        },
-        {
-          "name": "considerationNotes",
-          "type": "Record<string, string>",
-          "optional": false
-        },
-        {
-          "name": "compromiseWeight",
-          "type": "number",
-          "optional": false
-        },
-        {
-          "name": "busyDayWeight",
-          "type": "number",
-          "optional": false
-        },
-        {
-          "name": "confirmedAt",
-          "type": "number",
-          "optional": true
-        }
-      ],
+      "name": "SchedulePeriod",
+      "file": "schedule/SchedulePeriod.ts",
+      "kind": "value",
+      "fields": [],
       "getters": [
-        "id",
-        "scheduleId",
-        "worldLineNodeId",
-        "year",
-        "month",
-        "storeId",
-        "title",
-        "confirmedAt",
-        "compromises",
-        "busyDayContributions",
-        "contributionScores",
-        "compromiseWeight",
-        "busyDayWeight",
-        "considerationNotes"
+        "start",
+        "length",
+        "label",
+        "words",
+        "key",
+        "end"
       ],
       "methods": [
         {
-          "name": "idOf",
-          "params": [
-            "scheduleId",
-            "worldLineNodeId"
-          ],
-          "returns": "string",
-          "isStatic": true,
-          "returnsSelf": false
-        },
-        {
-          "name": "scheduleIdOf",
-          "params": [
-            "reportId"
-          ],
-          "returns": "string",
-          "isStatic": true,
-          "returnsSelf": false
-        },
-        {
-          "name": "defaultTitle",
-          "params": [
-            "year",
-            "month"
-          ],
-          "returns": "string",
-          "isStatic": true,
-          "returnsSelf": false
-        },
-        {
-          "name": "create",
-          "params": [
-            "params"
-          ],
-          "returns": "ScheduleReport",
-          "isStatic": true,
-          "returnsSelf": true
-        },
-        {
-          "name": "rename",
-          "params": [
-            "title"
-          ],
-          "returns": "ScheduleReport",
+          "name": "previous",
+          "params": [],
+          "returns": "SchedulePeriod",
           "isStatic": false,
           "returnsSelf": true
         },
         {
-          "name": "scoreOf",
-          "params": [
-            "staffId"
-          ],
-          "returns": "number",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "isReferenceableFrom",
-          "params": [
-            "target"
-          ],
-          "returns": "boolean",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "reweight",
-          "params": [
-            "compromiseWeight",
-            "busyDayWeight"
-          ],
-          "returns": "ScheduleReport",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "noteFor",
-          "params": [
-            "staffId"
-          ],
-          "returns": "string",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "setNote",
-          "params": [
-            "staffId",
-            "text"
-          ],
-          "returns": "ScheduleReport",
+          "name": "next",
+          "params": [],
+          "returns": "SchedulePeriod",
           "isStatic": false,
           "returnsSelf": true
         },
         {
           "name": "toPlain",
           "params": [],
-          "returns": "ScheduleReportState",
+          "returns": "SchedulePeriodPlain",
           "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "days",
+          "params": [],
+          "returns": "WorkingDay[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "contains",
+          "params": [
+            "day"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "startsRightAfter",
+          "params": [
+            "day"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "equals",
+          "params": [
+            "other"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromKey",
+          "params": [
+            "key"
+          ],
+          "returns": "SchedulePeriod | undefined",
+          "isStatic": true,
           "returnsSelf": false
         },
         {
@@ -1641,7 +2412,7 @@ export const MODEL_GRAPH: ModelGraph = {
           "params": [
             "plain"
           ],
-          "returns": "ScheduleReport",
+          "returns": "SchedulePeriod",
           "isStatic": true,
           "returnsSelf": true
         }
@@ -1666,6 +2437,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "shift",
           "type": "ShiftValue",
           "optional": false
+        },
+        {
+          "name": "dayOffReason",
+          "type": "string",
+          "optional": true
         }
       ],
       "getters": [
@@ -1673,6 +2449,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "day",
         "shift",
         "isDayOff",
+        "dayOffReason",
         "isUndecided",
         "isWorking",
         "shiftId"
@@ -1932,6 +2709,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "dayOffStyle",
           "type": "DayOffStyle",
           "optional": true
+        },
+        {
+          "name": "tags",
+          "type": "EmojiTag[]",
+          "optional": true
         }
       ],
       "getters": [
@@ -1939,9 +2721,38 @@ export const MODEL_GRAPH: ModelGraph = {
         "name",
         "department",
         "hasDayOffStyle",
-        "dayOffStyle"
+        "dayOffStyle",
+        "tags"
       ],
       "methods": [
+        {
+          "name": "addTag",
+          "params": [
+            "tag"
+          ],
+          "returns": "Staff",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "removeTag",
+          "params": [
+            "emoji"
+          ],
+          "returns": "Staff",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "updateTagLabel",
+          "params": [
+            "emoji",
+            "label"
+          ],
+          "returns": "Staff",
+          "isStatic": false,
+          "returnsSelf": true
+        },
         {
           "name": "rename",
           "params": [
@@ -1998,13 +2809,8 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": false
         },
         {
-          "name": "year",
-          "type": "number",
-          "optional": false
-        },
-        {
-          "name": "month",
-          "type": "number",
+          "name": "period",
+          "type": "SchedulePeriod",
           "optional": false
         },
         {
@@ -2021,8 +2827,7 @@ export const MODEL_GRAPH: ModelGraph = {
       "getters": [
         "id",
         "staffId",
-        "year",
-        "month",
+        "period",
         "filledDayCount",
         "isEmpty",
         "isSubmitted",
@@ -2033,8 +2838,7 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "idOf",
           "params": [
             "staffId",
-            "year",
-            "month"
+            "period"
           ],
           "returns": "string",
           "isStatic": true,
@@ -2114,7 +2918,7 @@ export const MODEL_GRAPH: ModelGraph = {
         {
           "name": "toPlain",
           "params": [],
-          "returns": "StaffMonthlyShiftWishState",
+          "returns": "StaffMonthlyShiftWishPlain",
           "isStatic": false,
           "returnsSelf": false
         },
@@ -2124,6 +2928,445 @@ export const MODEL_GRAPH: ModelGraph = {
             "plain"
           ],
           "returns": "StaffMonthlyShiftWish",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "StaffProfile",
+      "file": "staff/StaffProfile.ts",
+      "kind": "value",
+      "fields": [],
+      "getters": [
+        "emojiTags",
+        "leaderMarks"
+      ],
+      "methods": []
+    },
+    {
+      "name": "StaffProfileDictionary",
+      "file": "staff/StaffProfileDictionary.ts",
+      "kind": "part",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "items",
+          "type": "ProfileItem[]",
+          "optional": false
+        },
+        {
+          "name": "builtInMarks",
+          "type": "Partial<BuiltInProfileMarks>",
+          "optional": true
+        }
+      ],
+      "getters": [
+        "id",
+        "items"
+      ],
+      "methods": [
+        {
+          "name": "empty",
+          "params": [
+            "id"
+          ],
+          "returns": "StaffProfileDictionary",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "item",
+          "params": [
+            "itemId"
+          ],
+          "returns": "ProfileItem | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "showsBuiltIn",
+          "params": [
+            "key"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "withBuiltInMark",
+          "params": [
+            "key",
+            "shown"
+          ],
+          "returns": "StaffProfileDictionary",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "itemsIn",
+          "params": [
+            "category"
+          ],
+          "returns": "ProfileItem[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "addItem",
+          "params": [
+            "item"
+          ],
+          "returns": "StaffProfileDictionary",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "updateItem",
+          "params": [
+            "itemId",
+            "fn"
+          ],
+          "returns": "StaffProfileDictionary",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "removeItem",
+          "params": [
+            "itemId"
+          ],
+          "returns": "StaffProfileDictionary",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "StaffProfileDictionaryPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "StaffProfileDictionary",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "Store",
+      "file": "store/Store.ts",
+      "kind": "aggregate",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "format",
+          "type": "StoreFormat",
+          "optional": false
+        },
+        {
+          "name": "periodRule",
+          "type": "PeriodRule",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "id",
+        "name",
+        "format",
+        "periodRule"
+      ],
+      "methods": [
+        {
+          "name": "create",
+          "params": [
+            "params"
+          ],
+          "returns": "Store",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "fallback",
+          "params": [
+            "id"
+          ],
+          "returns": "Store",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "removed",
+          "params": [
+            "id"
+          ],
+          "returns": "Store",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "resolve",
+          "params": [
+            "stores",
+            "id",
+            "removedIds"
+          ],
+          "returns": "Store",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "rename",
+          "params": [
+            "name"
+          ],
+          "returns": "Store",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withFormat",
+          "params": [
+            "format"
+          ],
+          "returns": "Store",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withPeriodRule",
+          "params": [
+            "periodRule"
+          ],
+          "returns": "Store",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "periodContaining",
+          "params": [
+            "day"
+          ],
+          "returns": "SchedulePeriod",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "StorePlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "Store",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "StoreFormat",
+      "file": "store/StoreFormat.ts",
+      "kind": "part",
+      "fields": [
+        {
+          "name": "id",
+          "type": "StoreFormatId",
+          "optional": false
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "storeNoun",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "defaultRule",
+          "type": "(today: WorkingDay) => PeriodRule",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "id",
+        "label",
+        "storeNoun"
+      ],
+      "methods": [
+        {
+          "name": "defaultRule",
+          "params": [
+            "today"
+          ],
+          "returns": "PeriodRule",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "defaultAnchor",
+          "params": [
+            "today"
+          ],
+          "returns": "WorkingDay",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "of",
+          "params": [
+            "id"
+          ],
+          "returns": "StoreFormat",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "nounFor",
+          "params": [
+            "formats"
+          ],
+          "returns": "string",
+          "isStatic": true,
+          "returnsSelf": false
+        },
+        {
+          "name": "listOf",
+          "params": [
+            "ids"
+          ],
+          "returns": "StoreFormat[]",
+          "isStatic": true,
+          "returnsSelf": false
+        }
+      ]
+    },
+    {
+      "name": "SymbolMapping",
+      "file": "import-export/SymbolMapping.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "entries",
+          "type": "SymbolEntryPlain[]",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "entries"
+      ],
+      "methods": [
+        {
+          "name": "interpret",
+          "params": [
+            "symbol"
+          ],
+          "returns": "SymbolInterpretation | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "isConfirmedDayOff",
+          "params": [
+            "symbol"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "isEmpty",
+          "params": [
+            "symbol"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "symbolForDayOff",
+          "params": [
+            "reason"
+          ],
+          "returns": "string | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "symbolForWish",
+          "params": [
+            "optionKey"
+          ],
+          "returns": "string | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "addEntry",
+          "params": [
+            "entry"
+          ],
+          "returns": "SymbolMapping",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "removeEntry",
+          "params": [
+            "symbol"
+          ],
+          "returns": "SymbolMapping",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "updateEntry",
+          "params": [
+            "symbol",
+            "update"
+          ],
+          "returns": "SymbolMapping",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "SymbolMappingState",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "SymbolMapping",
           "isStatic": true,
           "returnsSelf": true
         }
@@ -2183,6 +3426,24 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "toDate",
           "params": [],
           "returns": "Date",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "addDays",
+          "params": [
+            "n"
+          ],
+          "returns": "WorkingDay",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "daysSince",
+          "params": [
+            "other"
+          ],
+          "returns": "number",
           "isStatic": false,
           "returnsSelf": false
         },
@@ -2404,6 +3665,15 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": true
         },
         {
+          "name": "memberOf",
+          "params": [
+            "staffId"
+          ],
+          "returns": "WorkingStaffMember | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
           "name": "toPlain",
           "params": [],
           "returns": "WorkingStaffGroupPlain",
@@ -2585,6 +3855,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": false
         },
         {
+          "name": "shortName",
+          "type": "string",
+          "optional": true
+        },
+        {
           "name": "aliases",
           "type": "string[]",
           "optional": true
@@ -2593,6 +3868,7 @@ export const MODEL_GRAPH: ModelGraph = {
       "getters": [
         "id",
         "name",
+        "shortName",
         "aliases",
         "startMinute",
         "startHour",
@@ -2755,6 +4031,30 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "relations": [
     {
+      "from": "ConfirmedSchedule",
+      "to": "SchedulePeriod",
+      "kind": "contains",
+      "via": "period",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "ConfirmedSchedule",
+      "to": "MonthlyStaffSchedule",
+      "kind": "references",
+      "via": "scheduleId",
+      "many": false,
+      "foundBy": "id-naming"
+    },
+    {
+      "from": "ConfirmedSchedule",
+      "to": "Store",
+      "kind": "references",
+      "via": "storeId",
+      "many": false,
+      "foundBy": "id-naming"
+    },
+    {
       "from": "ConstraintDelta",
       "to": "ConstraintViolation",
       "kind": "contains",
@@ -2811,6 +4111,30 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "id-naming"
     },
     {
+      "from": "DayOffTypeSet",
+      "to": "DayOffType",
+      "kind": "contains",
+      "via": "types",
+      "many": true,
+      "foundBy": "type"
+    },
+    {
+      "from": "FourWeekPeriod",
+      "to": "WorkingDay",
+      "kind": "contains",
+      "via": "start",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "FourWeekRule",
+      "to": "WorkingDay",
+      "kind": "contains",
+      "via": "anchor",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
       "from": "MonthlyStaffSchedule",
       "to": "ShiftAssignment",
       "kind": "contains",
@@ -2828,6 +4152,14 @@ export const MODEL_GRAPH: ModelGraph = {
     },
     {
       "from": "MonthlyStaffSchedule",
+      "to": "SchedulePeriod",
+      "kind": "contains",
+      "via": "period",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "MonthlyStaffSchedule",
       "to": "PrecedingMonthTail",
       "kind": "contains",
       "via": "precedingTail",
@@ -2841,6 +4173,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "via": "requiredStaffing",
       "many": false,
       "foundBy": "type"
+    },
+    {
+      "from": "MonthlyStaffSchedule",
+      "to": "Store",
+      "kind": "references",
+      "via": "storeId",
+      "many": false,
+      "foundBy": "id-naming"
     },
     {
       "from": "MonthlyStaffSchedule",
@@ -2883,15 +4223,15 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "type"
     },
     {
-      "from": "ScheduleCandidates",
-      "to": "MonthlyStaffSchedule",
-      "kind": "references",
-      "via": "scheduleId",
-      "many": false,
-      "foundBy": "id-naming"
+      "from": "ProfileItem",
+      "to": "ProfileValue",
+      "kind": "contains",
+      "via": "values",
+      "many": true,
+      "foundBy": "type"
     },
     {
-      "from": "ScheduleReport",
+      "from": "ScheduleCandidates",
       "to": "MonthlyStaffSchedule",
       "kind": "references",
       "via": "scheduleId",
@@ -2931,12 +4271,68 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "type"
     },
     {
+      "from": "Staff",
+      "to": "EmojiTag",
+      "kind": "contains",
+      "via": "tags",
+      "many": true,
+      "foundBy": "type"
+    },
+    {
+      "from": "StaffMonthlyShiftWish",
+      "to": "SchedulePeriod",
+      "kind": "contains",
+      "via": "period",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
       "from": "StaffMonthlyShiftWish",
       "to": "Staff",
       "kind": "references",
       "via": "staffId",
       "many": false,
       "foundBy": "id-naming"
+    },
+    {
+      "from": "StaffProfileDictionary",
+      "to": "ProfileItem",
+      "kind": "contains",
+      "via": "items",
+      "many": true,
+      "foundBy": "type"
+    },
+    {
+      "from": "Store",
+      "to": "StoreFormat",
+      "kind": "contains",
+      "via": "format",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "Store",
+      "to": "PeriodRule",
+      "kind": "contains",
+      "via": "periodRule",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "StoreFormat",
+      "to": "PeriodRule",
+      "kind": "contains",
+      "via": "defaultRule",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "StoreFormat",
+      "to": "WorkingDay",
+      "kind": "contains",
+      "via": "defaultRule",
+      "many": false,
+      "foundBy": "type"
     },
     {
       "from": "WorkingStaffGroup",
@@ -2981,23 +4377,23 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 46,
+    "fileCount": 61,
     "classesWithoutState": [
       "AllowedShiftConstraint",
+      "CalendarMonthRule",
       "MaxConsecutiveWorkdaysConstraint",
       "MaxDayOffPerDayConstraint",
       "MinMonthlyDayOffConstraint",
+      "PeriodRule",
       "RequiredStaffingConstraint",
+      "SchedulePeriod",
       "ShiftIntervalConstraint",
-      "ShiftLeaderConstraint"
+      "ShiftLeaderConstraint",
+      "StaffProfile"
     ],
     "unresolvedTypes": [],
     "unresolvedIdFields": [
-      "ConstraintSet.linkedReportId",
-      "MonthlyStaffSchedule.storeId",
-      "PrecedingMonthTail.sourceReportId",
-      "ScheduleReport.storeId",
-      "ScheduleReport.worldLineNodeId",
+      "ConfirmedSchedule.worldLineNodeId",
       "WorkingStaffMember.allowedShiftIds"
     ]
   }

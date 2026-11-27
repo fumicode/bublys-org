@@ -2,6 +2,7 @@ import {
   MonthlyStaffSchedule,
   RequiredStaffing,
   WorkingDay,
+  CalendarMonthPeriod,
 } from "@bublys-org/hotel-shift-puzzle-model";
 
 /**
@@ -59,8 +60,7 @@ export function createSampleScheduleFor(
   return MonthlyStaffSchedule.create({
     id,
     storeId: "store-1",
-    year,
-    month,
+    period: CalendarMonthPeriod.of(year, month),
     requiredStaffing,
   });
 }

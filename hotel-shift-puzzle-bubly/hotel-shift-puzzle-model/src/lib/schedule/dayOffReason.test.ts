@@ -4,6 +4,7 @@ import { PrecedingMonthTail } from './PrecedingMonthTail.js';
 import { DayOffStyle } from '../staff/DayOffStyle.js';
 import { dayOffReasonOf, dayOffReasonText } from './dayOffReason.js';
 import type { DecodedWish } from './autoShiftStep.js';
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 describe('dayOffReasonOf（その休みの役目を、いまの表から読み解く）', () => {
   const day = (d: number) => WorkingDay.of(2026, 6, d);
@@ -11,7 +12,7 @@ describe('dayOffReasonOf（その休みの役目を、いまの表から読み�
 
   /** 指定の日を休みにし、他の日は早番で埋めた6月 */
   const scheduleWithOffs = (offs: number[]) => {
-    let s = MonthlyStaffSchedule.create({ id: 's', storeId: 'store-1', year: 2026, month: 6 });
+    let s = MonthlyStaffSchedule.create({ id: 's', storeId: 'store-1', period: CalendarMonthPeriod.of(2026, 6) });
     for (let d = 1; d <= 30; d++) {
       s = offs.includes(d) ? s.assignDayOff('A', day(d)) : s.assignShift('A', day(d), 'early');
     }
@@ -80,10 +81,11 @@ describe('dayOffReasonOf（その休みの役目を、いまの表から読み�
   });
 
   test('前月末日の休みと続いていれば「前月末から続く連休」', () => {
-    let may = MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', year: 2026, month: 5 });
+    let may = MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', period: CalendarMonthPeriod.of(2026, 5) });
     may = may.assignDayOff('A', WorkingDay.of(2026, 5, 31));
     const tail = PrecedingMonthTail.capture({
-      sourceReportId: 'may:n',
+      source: { scheduleId: 'may', worldLineNodeId: 'n' },
+      stars: [],
       schedule: may,
       shiftNameOf: () => '早番',
       length: 7,
@@ -96,10 +98,11 @@ describe('dayOffReasonOf（その休みの役目を、いまの表から読み�
   });
 
   test('月初の休みの手前には、前月末からの出勤を数える', () => {
-    let may = MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', year: 2026, month: 5 });
+    let may = MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', period: CalendarMonthPeriod.of(2026, 5) });
     for (let d = 28; d <= 31; d++) may = may.assignShift('A', WorkingDay.of(2026, 5, d), 'early');
     const tail = PrecedingMonthTail.capture({
-      sourceReportId: 'may:n',
+      source: { scheduleId: 'may', worldLineNodeId: 'n' },
+      stars: [],
       schedule: may,
       shiftNameOf: () => '早番',
       length: 7,
@@ -179,7 +182,7 @@ describe('dayOffReasonOf（その休みの役目を、いまの表から読み�
     });
 
     test('隣が空いているのに単発なら、月の休みを区切りに使い切った', () => {
-      let s = MonthlyStaffSchedule.create({ id: 's', storeId: 'store-1', year: 2026, month: 6 });
+      let s = MonthlyStaffSchedule.create({ id: 's', storeId: 'store-1', period: CalendarMonthPeriod.of(2026, 6) });
       for (const d of [6, 12, 18, 24, 30, 1, 2, 3]) s = s.assignDayOff('A', day(d));
       expect(reasonOf(s, 12, { style: clustered, minDayOff: 8 })?.unpaired).toEqual({
         kind: 'out-of-days',

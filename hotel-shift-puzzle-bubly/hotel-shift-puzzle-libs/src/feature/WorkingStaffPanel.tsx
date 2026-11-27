@@ -1,8 +1,9 @@
 'use client';
 
-import { FC, useEffect } from "react";
+import { FC, useEffect, useMemo } from "react";
 import styled from "styled-components";
 import {
+  ConstraintSet,
   MonthlyStaffSchedule,
   WorkShift,
   WorkShiftSet,
@@ -15,8 +16,9 @@ import {
   useObjectRepo,
   useObjectsPending,
 } from "../objects/repository.js";
-import { SCHEDULE_TYPE, WORKSHIFT_SET_TYPE } from "../objects/hotelObjects.js";
+import { CONSTRAINT_SET_TYPE, SCHEDULE_TYPE, WORKSHIFT_SET_TYPE } from "../objects/hotelObjects.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
+import { staffProfileResolver, useGlobalStaffById } from "./staffProfile.js";
 import { useWorkingStaff } from "./workingStaff.js";
 
 type Props = {
@@ -40,6 +42,7 @@ const WorkingStaffPanelBody: FC<Props> = ({ scheduleId }) => {
   const {
     staffList,
     roster,
+    group,
     isTemporary,
     canEdit,
     addFromRoster,
@@ -54,6 +57,20 @@ const WorkingStaffPanelBody: FC<Props> = ({ scheduleId }) => {
     dayOffStyleOf,
     overrideDayOffStyle,
   } = useWorkingStaff(scheduleId);
+
+  // スタッフプロファイル（絵文字タグ・責任者。名前の横に並べる）
+  const globalStaffById = useGlobalStaffById();
+  const constraintSet = useObject<ConstraintSet>(CONSTRAINT_SET_TYPE, scheduleId);
+  const profileOf = useMemo(
+    () =>
+      staffProfileResolver({
+        staffList,
+        staffGroup: group,
+        leaderRules: constraintSet?.leaderRules,
+        globalStaffById,
+      }),
+    [staffList, group, constraintSet, globalStaffById]
+  );
 
   // チェック欄の列＝この勤務表の勤務帯セット（id=scheduleId）
   const { object: workShiftSet, update: updateSet } = useObjectShell<WorkShiftSet>(
@@ -99,7 +116,7 @@ const WorkingStaffPanelBody: FC<Props> = ({ scheduleId }) => {
     <StyledContainer>
       <div className="e-header">
         <h3>
-          {schedule.year}年{schedule.month}月勤務スタッフ({staffList.length}名)
+          {schedule.period.label}勤務スタッフ({staffList.length}名)
         </h3>
       </div>
       <WorkingStaffListView
@@ -117,6 +134,7 @@ const WorkingStaffPanelBody: FC<Props> = ({ scheduleId }) => {
         onToggleShift={toggleShift}
         onCommitShift={workShiftSet ? handleCommitShift : undefined}
         onRemoveShift={(id) => updateSet((s) => s.remove(id))}
+        profileOf={profileOf}
         dayOffStyleOf={dayOffStyleOf}
         onChangeDayOffStyle={overrideDayOffStyle}
       />
