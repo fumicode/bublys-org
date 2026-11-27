@@ -1,23 +1,16 @@
 'use client';
 
 import { FC } from "react";
-import { DayOffStyle, DAY_OFF_STYLE_MAX_RUN_OPTIONS } from "../domain/index.js";
+import { DayOffStyle } from "../domain/index.js";
 
 /** 選択肢の値（select の value は文字列なので、休みの形を文字列に畳む） */
 const valueOf = (style: DayOffStyle): string =>
-  style.isClustered ? `clustered:${style.maxRun ?? ""}` : "spread";
+  style.isClustered ? "clustered" : "spread";
 
-const styleOf = (value: string): DayOffStyle => {
-  if (!value.startsWith("clustered:")) return DayOffStyle.spread();
-  const n = Number(value.slice("clustered:".length));
-  return DayOffStyle.clustered(Number.isFinite(n) && n > 0 ? n : undefined);
-};
+const styleOf = (value: string): DayOffStyle =>
+  value === "clustered" ? DayOffStyle.clustered() : DayOffStyle.spread();
 
-const CHOICES: DayOffStyle[] = [
-  DayOffStyle.spread(),
-  ...DAY_OFF_STYLE_MAX_RUN_OPTIONS.map((n) => DayOffStyle.clustered(n)),
-  DayOffStyle.clustered(),
-];
+const CHOICES: DayOffStyle[] = [DayOffStyle.spread(), DayOffStyle.clustered()];
 
 type Props = {
   /** いま選ばれている休みの形。inherited を渡したときに undefined なら「既定のまま」 */
@@ -35,8 +28,7 @@ type Props = {
 };
 
 /**
- * 休みの形を選ぶ。分散型／連休型（◯連まで／上限まで）。
- * 連休型は続けて出勤してよい日数（4連1休・5連1休の区別）を一緒に選ぶ。
+ * 休みの形を選ぶ。分散型／連休型の2択トグル。
  */
 export const DayOffStyleSelect: FC<Props> = ({
   value,

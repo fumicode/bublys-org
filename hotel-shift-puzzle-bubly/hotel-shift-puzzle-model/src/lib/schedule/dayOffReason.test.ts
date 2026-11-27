@@ -62,20 +62,18 @@ describe('dayOffReasonOf（その休みの役目を、いまの表から読み�
     });
   });
 
-  test('連休型で、外すとその人の目標を超えるなら、目標を守っている休み', () => {
-    // 2日働いて休み、また1日働く → 外すと4連勤。上限(5)は超えないが、3連までの人には超える
+  test('連休型でも、連勤上限の判定は全体の上限を使う', () => {
+    // 連休型は maxRun を持たないので、全体の連勤上限(5)を超えなければ keeps-run-limit にならない
     const s = scheduleWithOffs([3, 5, 9, 13, 17, 21, 25, 29]);
-    expect(reasonOf(s, 3, { style: DayOffStyle.clustered(3) })).toMatchObject({
-      kind: 'keeps-run-limit',
-      runIfRemoved: 4,
-      limit: 3,
-      personal: true,
+    // 外すと4連勤。上限(5)は超えないので between になる
+    expect(reasonOf(s, 3, { style: DayOffStyle.clustered() })).toMatchObject({
+      kind: 'between',
     });
   });
 
   test('連休型で隣も休みなら「連休」。分散型なら連休とは言わない', () => {
     const s = scheduleWithOffs([1, 2, 6, 7, 11, 12, 16, 17, 21, 22, 26, 27]);
-    expect(reasonOf(s, 7, { style: DayOffStyle.clustered(5) })).toEqual({
+    expect(reasonOf(s, 7, { style: DayOffStyle.clustered() })).toEqual({
       kind: 'pair',
       acrossMonth: false,
     });
@@ -131,17 +129,17 @@ describe('dayOffReasonOf（その休みの役目を、いまの表から読み�
   test('説明文には休みの形の名前を添える', () => {
     expect(
       dayOffReasonText(
-        { kind: 'keeps-run-limit', runIfRemoved: 6, limit: 4, personal: true },
-        DayOffStyle.clustered(4)
+        { kind: 'keeps-run-limit', runIfRemoved: 6, limit: 5, personal: false },
+        DayOffStyle.clustered()
       )
-    ).toBe('休み：外すと6連勤になります（この人は4連まで）（連休型（4連まで））');
+    ).toBe('休み：外すと6連勤になります（上限5連勤）（連休型）');
     expect(dayOffReasonText({ kind: 'between', before: 3, after: 2 }, DayOffStyle.spread())).toBe(
       '休み：3日と2日の出勤の間の休み（分散型）'
     );
   });
 
   describe('連休型の単発の休みには、連休にできなかった理由を添える', () => {
-    const clustered = DayOffStyle.clustered(5);
+    const clustered = DayOffStyle.clustered();
     /** 比べやすいように、隣の日を日付キーに畳む */
     const blocksOf = (r: ReturnType<typeof reasonOf>) =>
       r?.unpaired?.kind === 'neighbors'
@@ -217,7 +215,7 @@ describe('dayOffReasonOf（その休みの役目を、いまの表から読み�
           { maxDayOffPerDay: 3 }
         )
       ).toBe(
-        '休み：3日と3日の出勤の間の休み（連休型（5連まで））\n連休にできなかった：6/10は出勤の希望・6/12は休みが1日の上限（3人）'
+        '休み：3日と3日の出勤の間の休み（連休型）\n連休にできなかった：6/10は出勤の希望・6/12は休みが1日の上限（3人）'
       );
     });
   });

@@ -149,6 +149,8 @@ export type AutoShiftParams = {
   maxDayOffPerDay?: number;
   /** 全体の連勤上限。連休型の人の出勤の塊をこの長さ（目標があれば小さい方）で区切る */
   maxConsecutiveWorkdays?: number;
+  /** 1手の配置が成功するたびに呼ばれるコールバック（世界線に中間ステップを記録する用） */
+  onPlace?: (schedule: MonthlyStaffSchedule) => void;
 };
 
 /** 自動シフトが目指す休みの置き方（制約セットから取り出したもの） */
@@ -187,6 +189,7 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
     minDayOff,
     maxDayOffPerDay,
     maxConsecutiveWorkdays,
+    onPlace,
   } = params;
 
   const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
@@ -216,6 +219,7 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
     maxDayOffPerDay,
     maxConsecutiveWorkdays,
     dayOffStyleOf: dayOffStyleResolver(staffList, staffGroup),
+    onPlace,
   };
 };
 

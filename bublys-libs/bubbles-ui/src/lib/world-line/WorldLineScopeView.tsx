@@ -4,6 +4,7 @@ import type { CasScopeValue } from "@bublys-org/world-line-graph";
 import { useKeyBindings, type KeyBinding } from "../hooks/useKeyBindings.js";
 import { WorldLinesCanvasView, type WorldLinesCanvasViewProps } from "./WorldLinesCanvasView.js";
 import { isCommitKey } from "../utils/ime.js";
+import { createDefaultFoldState, toggleFold, foldAll, type FoldState } from "./commandFold.js";
 
 const EMPTY_BINDINGS: KeyBinding[] = [];
 
@@ -57,6 +58,11 @@ export type WorldLineScopeViewProps = {
    */
   renderCanvas?: (props: WorldLinesCanvasViewProps) => ReactNode;
   /**
+   * true にするとコマンドグループの折りたたみを有効にする。
+   * commandGroupId を持つノード群がレベルに応じて折りたたまれる。
+   */
+  foldable?: boolean;
+  /**
    * 節目のノード（バブリが「この世界線の中で意味のある地点」と呼ぶもの）。旗を立てて描く。
    * 何を節目とするかはバブリが決める（例: hotel は勤務表の確定版）。renderCanvas にもそのまま渡る。
    */
@@ -71,11 +77,37 @@ export const WorldLineScopeView: FC<WorldLineScopeViewProps> = ({
   onSelectNode,
   style,
   renderCanvas,
+  foldable = false,
   milestoneNodeIds,
 }) => {
-  useKeyBindings(keyBindings ?? EMPTY_BINDINGS);
   const apexId = scope.graph.getApex()?.id ?? null;
   const apexLabel = (apexId ? scope.graph.state.nodes[apexId]?.label : undefined) ?? "";
+
+  const [foldState, setFoldState] = useState<FoldState>(() =>
+    createDefaultFoldState("command")
+  );
+  const handleToggleFold = useCallback(
+    (commandGroupId: string) => {
+      setFoldState((prev) => toggleFold(prev, commandGroupId));
+    },
+    []
+  );
+  const handleFoldAll = useCallback(() => {
+    setFoldState((prev) => foldAll(prev));
+  }, []);
+
+  const foldBindings = useMemo<KeyBinding[]>(
+    () =>
+      foldable
+        ? [{ keys: "f", run: handleFoldAll }]
+        : [],
+    [foldable, handleFoldAll]
+  );
+  const mergedBindings = useMemo(
+    () => [...(keyBindings ?? EMPTY_BINDINGS), ...foldBindings],
+    [keyBindings, foldBindings]
+  );
+  useKeyBindings(mergedBindings);
 
   // 状態要約はそのまま、ラベル（名前）は別レイヤーで吹き出し表示する。
   // ユーザーが付けた名前を優先し、無ければ意図の名前（open:… / close:… 等）を出す
@@ -136,6 +168,9 @@ export const WorldLineScopeView: FC<WorldLineScopeViewProps> = ({
         getNodeLabel,
         onSelectNode: onSelectNode ?? scope.moveTo,
         onApexScreenPos: nameable ? placeInput : undefined,
+        ...(foldable
+          ? { foldState, onToggleFold: handleToggleFold }
+          : {}),
         milestoneNodeIds,
       })}
     </div>

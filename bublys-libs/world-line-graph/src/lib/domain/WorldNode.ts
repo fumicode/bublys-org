@@ -21,6 +21,15 @@ export interface WorldNode {
   readonly intentId?: string;
   /** 意図の名前（open:… / drag / close:… など）。DAG 表示のフォールバック名に使う。 */
   readonly intentLabel?: string;
+  /**
+   * 複数ステップからなるコマンドのグループID。
+   * 同じ commandGroupId を持つノードは1つのコマンドの中間ステップ群を表す。
+   */
+  readonly commandGroupId?: string;
+  /** このノードがコマンド内の何番目のステップか（0始まり） */
+  readonly commandStepIndex?: number;
+  /** コマンド全体のステップ数 */
+  readonly commandStepCount?: number;
 }
 
 function generateNodeId(stateHash?: string): string {
@@ -29,19 +38,30 @@ function generateNodeId(stateHash?: string): string {
   // id 後半は**このノードが生まれた瞬間**の world hash。
   // 同じ意図の中で中身が amend されると、現在の node.stateHash とは一致しなくなる。
   // world の同一性を見るときは必ず node.stateHash を使うこと（id からは導かない）。
-  // stateHash が無い場合（旧経路）だけランダムにフォールバックする。
-  const suffix = stateHash ?? Math.random().toString(36).slice(2, 8);
-  return `${timestamp}-${suffix}`;
+  // skipSnap で同じ状態のノードを強制的に作るとき、同一ミリ秒 + 同一 hash で
+  // ID が衝突するのを防ぐため、常にランダム要素を末尾に付ける。
+  const hash = stateHash ?? Math.random().toString(36).slice(2, 8);
+  const random = Math.random().toString(36).slice(2, 6);
+  return `${timestamp}-${hash}-${random}`;
 }
+
+export type CreateWorldNodeOptions = {
+  stateHash?: string;
+  intentId?: string;
+  intentLabel?: string;
+  commandGroupId?: string;
+  commandStepIndex?: number;
+  commandStepCount?: number;
+};
 
 export function createWorldNode(
   parentId: string | null,
   changedRefs: StateRef[],
   worldLineId: string,
-  stateHash?: string,
-  intentId?: string,
-  intentLabel?: string
+  options?: CreateWorldNodeOptions
 ): WorldNode {
+  const { stateHash, intentId, intentLabel, commandGroupId, commandStepIndex, commandStepCount } =
+    options ?? {};
   return {
     id: generateNodeId(stateHash),
     parentId,
@@ -51,5 +71,8 @@ export function createWorldNode(
     ...(stateHash ? { stateHash } : {}),
     ...(intentId ? { intentId } : {}),
     ...(intentLabel ? { intentLabel } : {}),
+    ...(commandGroupId ? { commandGroupId } : {}),
+    ...(commandStepIndex !== undefined ? { commandStepIndex } : {}),
+    ...(commandStepCount !== undefined ? { commandStepCount } : {}),
   };
 }

@@ -18,6 +18,7 @@ import {
   setGraph,
   setCasEntries,
   type StateRef,
+  type GrowOptions,
 } from "@bublys-org/world-line-graph";
 import {
   getDescriptor,
@@ -108,7 +109,8 @@ export type ScopeChange = {
 export function growScope(
   store: StoreLike,
   scopeId: string,
-  change: ScopeChange
+  change: ScopeChange,
+  growOptions?: GrowOptions
 ): WorldLineGraph {
   const refs: StateRef[] = [];
   const casEntries: { hash: string; data: unknown }[] = [];
@@ -130,7 +132,7 @@ export function growScope(
 
   if (refs.length === 0) return graphOf(store, scopeId);
 
-  const updated = graphOf(store, scopeId).grow(refs);
+  const updated = graphOf(store, scopeId).grow(refs, growOptions);
   store.dispatch(setGraph({ scopeId, graph: updated.toJSON() }));
   if (casEntries.length > 0) {
     // Redux の CAS は 300 件で頭打ちなので、「今の世界」が参照する分は間引きから守る
@@ -366,7 +368,7 @@ export function bornWorldsOf(store: StoreLike, items: BundleItem[]): void {
  * 名前を黙って書き換えてしまう。grow の前に知っていたノードなら手を出さない。
  * 既に名前が付いているノードにも付けない（人が付けた名前を奪わない）。
  */
-function labelIfNew(
+export function labelIfNew(
   store: StoreLike,
   scopeId: string,
   nodeId: string,
@@ -379,6 +381,22 @@ function labelIfNew(
   store.dispatch(
     setGraph({ scopeId, graph: graph.setNodeLabel(nodeId, label).toJSON() })
   );
+}
+
+/** スコープの apex を親へ戻す（兄弟ブランチを作るために使う） */
+export function moveToNode(store: StoreLike, scopeId: string, nodeId: string): void {
+  const moved = graphOf(store, scopeId).moveTo(nodeId);
+  store.dispatch(setGraph({ scopeId, graph: moved.toJSON() }));
+}
+
+/** スコープの現在の apex ノードID */
+export function getApexNodeId(store: StoreLike, scopeId: string): string | null {
+  return graphOf(store, scopeId).state.apexNodeId;
+}
+
+/** スコープに現在存在する全ノードIDの集合 */
+export function getKnownNodeIds(store: StoreLike, scopeId: string): Set<string> {
+  return new Set(Object.keys(graphOf(store, scopeId).state.nodes));
 }
 
 /** スコープの apex から型・IDのオブジェクトを読む */
@@ -644,6 +662,55 @@ export function commitCandidates(
   }
 
   return { parentNodeId, nodeIds };
+}
+
+export function generateCommandGroupId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).slice(2, 8);
+  return `cg-${timestamp}-${random}`;
+}
+
+/**
+ * 完成案を兄弟ブランチとして記録する。各案の中間ステップは onPlace コールバック経由で
+ * 1手ずつ growScope される（呼び出し側が runAutoShiftStep に onPlace を渡す）。
+ *
+ * この関数は「共通の親から分岐させ、案ごとにブランチを切り、最後に案1に着地する」
+ * という世界線の構造だけを担う。ステップ実行と1手ごとの記録は呼び出し側の責任。
+ *
+ * @param runCandidate 案を1つ実行する関数。phase と commandGroupId を受け取り、
+ *   内部で各ステップを実行して onPlace 経由で世界線にノードを刻む。
+ *   完了後の案のラベル（"案1" 等）を返す。
+ */
+export function runCandidateBranches(
+  store: StoreLike,
+  scopeId: string,
+  type: string,
+  baseObj: unknown,
+  candidateCount: number,
+  runCandidate: (phase: number, commandGroupId: string) => string | undefined
+): void {
+  ensureWorldBorn(store, scopeId, [{ type, obj: baseObj }]);
+  const parentNodeId = graphOf(store, scopeId).state.apexNodeId as string;
+  const knownNodeIds = getKnownNodeIds(store, scopeId);
+  let firstCandidateApex: string | null = null;
+
+  for (let i = 0; i < candidateCount; i++) {
+    if (i > 0) {
+      moveToNode(store, scopeId, parentNodeId);
+    }
+
+    const commandGroupId = generateCommandGroupId();
+    const label = runCandidate(i, commandGroupId);
+
+    const apex = getApexNodeId(store, scopeId);
+    if (apex && label) labelIfNew(store, scopeId, apex, knownNodeIds, label);
+    if (i === 0 && apex) firstCandidateApex = apex;
+  }
+
+  // 案1の最終ノードに着地
+  if (firstCandidateApex) {
+    moveToNode(store, scopeId, firstCandidateApex);
+  }
 }
 
 /**

@@ -849,7 +849,6 @@ export const MODEL_GRAPH: ModelGraph = {
       ],
       "getters": [
         "isClustered",
-        "maxRun",
         "label"
       ],
       "methods": [
@@ -862,9 +861,7 @@ export const MODEL_GRAPH: ModelGraph = {
         },
         {
           "name": "clustered",
-          "params": [
-            "maxRun"
-          ],
+          "params": [],
           "returns": "DayOffStyle",
           "isStatic": true,
           "returnsSelf": true

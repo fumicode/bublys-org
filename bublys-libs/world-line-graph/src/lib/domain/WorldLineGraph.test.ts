@@ -167,6 +167,44 @@ describe('WorldLineGraph', () => {
       expect(again.state.apexNodeId).toBe(apexId);
       expect(Object.keys(again.state.nodes)).toHaveLength(1);
     });
+
+    it('skipSnap: true なら同じ状態でも新ノードを作る', () => {
+      const s0 = createStateRef('counter', '1', 'hash0');
+      const base = WorldLineGraph.empty().grow([s0]);
+
+      const forced = base.grow([s0], { skipSnap: true });
+
+      expect(Object.keys(forced.state.nodes)).toHaveLength(2);
+      expect(forced.state.apexNodeId).not.toBe(base.state.apexNodeId);
+    });
+  });
+
+  describe('grow() commandGroup メタデータ', () => {
+    it('commandGroup 情報がノードに記録される', () => {
+      const s0 = createStateRef('counter', '1', 'hash0');
+      const s1 = createStateRef('counter', '1', 'hash1');
+      const base = WorldLineGraph.empty().grow([s0]);
+
+      const stepped = base.grow([s1], {
+        commandGroupId: 'cg-1',
+        commandStepIndex: 0,
+        commandStepCount: 3,
+      });
+
+      const node = stepped.state.nodes[stepped.state.apexNodeId!];
+      expect(node.commandGroupId).toBe('cg-1');
+      expect(node.commandStepIndex).toBe(0);
+      expect(node.commandStepCount).toBe(3);
+    });
+
+    it('commandGroup を渡さなければフィールドは付かない', () => {
+      const s0 = createStateRef('counter', '1', 'hash0');
+      const graph = WorldLineGraph.empty().grow([s0]);
+      const node = graph.state.nodes[graph.state.apexNodeId!];
+      expect(node.commandGroupId).toBeUndefined();
+      expect(node.commandStepIndex).toBeUndefined();
+      expect(node.commandStepCount).toBeUndefined();
+    });
   });
 
   describe('moveTo()', () => {

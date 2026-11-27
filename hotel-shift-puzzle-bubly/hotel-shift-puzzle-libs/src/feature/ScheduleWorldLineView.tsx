@@ -82,6 +82,7 @@ const ScheduleWorldLineViewBody: FC<Props> = ({ scheduleId }) => {
         scope={scope}
         keyBindings={keyBindings}
         nameable
+        foldable
         milestoneNodeIds={milestones}
       />
     </StyledWrap>

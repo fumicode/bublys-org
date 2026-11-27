@@ -123,14 +123,8 @@ export function dayOffReasonOf(input: DayOffReasonInput): DayOffReason | undefin
       personal: false,
     });
   }
-  if (style.isClustered) {
-    const limit = style.runLimitWithin(maxConsecutiveWorkdays);
-    if (runIfRemoved > limit) {
-      return withUnpaired({ kind: "keeps-run-limit", runIfRemoved, limit, personal: true });
-    }
-    if (prevOff || nextOff) {
-      return { kind: "pair", acrossMonth: idx === 0 && prevOff && !nextOff };
-    }
+  if (style.isClustered && (prevOff || nextOff)) {
+    return { kind: "pair", acrossMonth: idx === 0 && prevOff && !nextOff };
   }
   return withUnpaired({ kind: "between", before, after });
 }

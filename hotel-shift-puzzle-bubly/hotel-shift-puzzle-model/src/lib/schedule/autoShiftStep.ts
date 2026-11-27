@@ -71,6 +71,11 @@ export type AutoShiftContext = {
    * 省略時は全員分散型。
    */
   dayOffStyleOf?: (staffId: string) => DayOffStyle;
+  /**
+   * 1手の配置（assignDayOff / assignShift）が成功するたびに呼ばれるコールバック。
+   * 世界線に中間ステップを記録するために使う。省略時は何もしない。
+   */
+  onPlace?: (schedule: MonthlyStaffSchedule) => void;
 };
 
 /**
