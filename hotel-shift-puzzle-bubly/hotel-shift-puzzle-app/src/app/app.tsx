@@ -17,8 +17,8 @@ import { useAppDispatch, setLightweightMode } from '@bublys-org/state-management
 BubbleRouteRegistry.registerRoutes(hotelShiftPuzzleBubbleRoutes);
 
 const SUBTITLE_BY_FORMAT: Record<string, string> = {
-  hotel: "旅館のシフトを、試しながら作る",
-  government: "シフトを、試しながら作る",
+  hotel: "トントン拍子にシフトが決まる",
+  government: "トントン拍子にシフトが決まる",
 };
 const appSubtitle = SUBTITLE_BY_FORMAT[availableStoreFormats[0].id] ?? SUBTITLE_BY_FORMAT.hotel;
 

@@ -29,7 +29,7 @@ export const DEMO_SITES: readonly DemoSite[] = [
   {
     id: 'shiftonton',
     name: 'シフトントン',
-    note: '旅館のシフトを、試しながら作る',
+    note: 'トントン拍子にシフトが決まる',
     short: 'シフ',
     url: 'https://hotel-shift-puzzle.bublys.ooo/',
   },
