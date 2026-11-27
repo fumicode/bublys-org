@@ -50,3 +50,4 @@ export * from "./excelIO.js";
 export * from "./shiftExcelImport.js";
 export * from "./shiftExcelExport.js";
 export * from "./ShiftExcelPanel.js";
+export * from "./shiftTemplateExport.js";

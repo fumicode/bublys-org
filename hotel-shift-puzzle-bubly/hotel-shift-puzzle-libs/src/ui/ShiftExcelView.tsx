@@ -5,32 +5,48 @@ import styled from "styled-components";
 import { Alert, Button } from "@mui/material";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import DownloadIcon from "@mui/icons-material/Download";
+import TableChartIcon from "@mui/icons-material/TableChart";
 
 export type ShiftExcelViewProps = {
   /** インポート可能か（勤務表が選択されているかなど） */
   canImport: boolean;
   /** エクスポート可能か */
   canExport: boolean;
+  /** テンプレートエクスポートが可能か（行政版のみ） */
+  canTemplateExport?: boolean;
   /** 処理中か */
   busy: boolean;
   /** メッセージ（成功・警告・エラー） */
   message: { kind: "info" | "warn" | "error"; text: string } | null;
   /** インポート結果のサマリ */
   importSummary: string | null;
+  /** テンプレート更新の確認を表示するか */
+  templateUpdatePrompt?: boolean;
   onImport: (file: File) => void;
   onExport: () => void;
+  /** テンプレートExcelでエクスポート */
+  onTemplateExport?: () => void;
   onDismissMessage: () => void;
+  /** テンプレート更新を承認 */
+  onConfirmTemplateUpdate?: () => void;
+  /** テンプレート更新をスキップ */
+  onSkipTemplateUpdate?: () => void;
 };
 
 export const ShiftExcelView: FC<ShiftExcelViewProps> = ({
   canImport,
   canExport,
+  canTemplateExport,
   busy,
   message,
   importSummary,
+  templateUpdatePrompt,
   onImport,
   onExport,
+  onTemplateExport,
   onDismissMessage,
+  onConfirmTemplateUpdate,
+  onSkipTemplateUpdate,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -75,20 +91,49 @@ export const ShiftExcelView: FC<ShiftExcelViewProps> = ({
         </Alert>
       )}
 
+      {templateUpdatePrompt && (
+        <Alert severity="info" className="e-summary">
+          <div className="e-template-prompt">
+            <span>このファイルをエクスポート用テンプレートとして保存しますか？</span>
+            <div className="e-buttons">
+              <Button size="small" variant="contained" onClick={onConfirmTemplateUpdate}>
+                保存する
+              </Button>
+              <Button size="small" variant="text" onClick={onSkipTemplateUpdate}>
+                スキップ
+              </Button>
+            </div>
+          </div>
+        </Alert>
+      )}
+
       <div className="e-section">
         <h4 className="e-section-title">エクスポート（出力）</h4>
         <p className="e-desc">
           現在の勤務表を Excel (.xlsx) ファイルとしてダウンロードします。
         </p>
-        <Button
-          variant="outlined"
-          startIcon={<DownloadIcon />}
-          onClick={onExport}
-          disabled={!canExport || busy}
-          size="small"
-        >
-          Excel をダウンロード
-        </Button>
+        <div className="e-buttons">
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            onClick={onExport}
+            disabled={!canExport || busy}
+            size="small"
+          >
+            Excel をダウンロード
+          </Button>
+          {canTemplateExport && (
+            <Button
+              variant="outlined"
+              startIcon={<TableChartIcon />}
+              onClick={onTemplateExport}
+              disabled={!canExport || busy}
+              size="small"
+            >
+              集計付きテンプレート
+            </Button>
+          )}
+        </div>
       </div>
 
       {message && (
@@ -136,8 +181,20 @@ const StyledContainer = styled.div`
     line-height: 1.4;
   }
 
+  .e-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
   .e-summary,
   .e-message {
     font-size: 12px;
+  }
+
+  .e-template-prompt {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
 `;

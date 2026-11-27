@@ -28,6 +28,14 @@ export type StaffEntry = {
   cellsByDay: ReadonlyMap<string, string>;
 };
 
+/** 凡例の1セクション（正規職員 or 会計年度任用） */
+export type LegendSection = {
+  /** 凡例のシンボル（"Ａ", "Ｂ", "①" など。全角のまま） */
+  symbols: string[];
+  /** 各シンボルの説明（"8：00～16：45" など）。symbols と同じ長さ */
+  descriptions: string[];
+};
+
 export type GovernmentShiftImportData = {
   /** 期間（SchedulePeriod）。タイトルから読み取れた場合 */
   period: SchedulePeriod | undefined;
@@ -37,6 +45,10 @@ export type GovernmentShiftImportData = {
   days: WorkingDay[];
   /** スタッフ行のデータ */
   staffEntries: StaffEntry[];
+  /** 凡例（正規職員 / 会計年度任用）。テンプレートに凡例があれば2セクション */
+  legendSections: LegendSection[];
+  /** 月間休暇日数（AI4セルの値）。休日制約の入り口 */
+  holidayCount: number | undefined;
 };
 
 // ========== 全角→半角変換 ==========
@@ -120,7 +132,7 @@ export function parseGovernmentShift(
   grid: string[][],
 ): GovernmentShiftImportData {
   if (grid.length === 0) {
-    return { period: undefined, title: "", days: [], staffEntries: [] };
+    return { period: undefined, title: "", days: [], staffEntries: [], legendSections: [], holidayCount: undefined };
   }
 
   // --- タイトルを探す ---
@@ -150,7 +162,7 @@ export function parseGovernmentShift(
   }
 
   if (dayRowIndex === -1) {
-    return { period: undefined, title, days: [], staffEntries: [] };
+    return { period: undefined, title, days: [], staffEntries: [], legendSections: [], holidayCount: undefined };
   }
 
   // --- 日付列のマッピング（列インデックス → WorkingDay） ---
@@ -198,7 +210,18 @@ export function parseGovernmentShift(
     }
   }
 
-  return { period, title, days, staffEntries };
+  // --- 凡例をパース ---
+  const legendSections = parseLegendSections(grid);
+
+  // --- 月間休暇日数（AI4）をパース ---
+  const holidayCountRaw = dayRowIndex >= 0
+    ? grid[dayRowIndex]?.[HOLIDAY_COUNT_COL]?.trim()
+    : undefined;
+  const holidayCount = holidayCountRaw && /^\d+$/.test(holidayCountRaw)
+    ? Number(holidayCountRaw)
+    : undefined;
+
+  return { period, title, days, staffEntries, legendSections, holidayCount };
 }
 
 // ========== 内部ヘルパー ==========
@@ -274,4 +297,48 @@ function parseStaffRow(
   }
 
   return { rowNumber, subNumber, name, cellsByDay };
+}
+
+// ========== 凡例パース ==========
+
+/** AI列（col 34）の月間休暇日数 */
+const HOLIDAY_COUNT_COL = 34;
+
+/** AW列（col 48）の凡例ヘッダー */
+const LEGEND_HEADER = "時間帯";
+const LEGEND_SYMBOL_COL = 48;
+const LEGEND_DESC_COL = 49;
+
+/**
+ * テンプレートの凡例セクションを読み取る。
+ * "時間帯" ヘッダーの直下からシンボルが並ぶ行を集める。
+ * 2セクション: 正規職員（上）→ 会計年度任用（下）
+ */
+function parseLegendSections(grid: string[][]): LegendSection[] {
+  const sections: LegendSection[] = [];
+  let row = 0;
+
+  while (row < grid.length) {
+    const cell = grid[row]?.[LEGEND_SYMBOL_COL]?.trim() ?? "";
+    if (cell === LEGEND_HEADER) {
+      row++;
+      const symbols: string[] = [];
+      const descriptions: string[] = [];
+      while (row < grid.length) {
+        const sym = grid[row]?.[LEGEND_SYMBOL_COL]?.trim() ?? "";
+        if (!sym || sym === LEGEND_HEADER) break;
+        symbols.push(sym);
+        const desc = grid[row]?.[LEGEND_DESC_COL]?.trim() ?? "";
+        descriptions.push(desc);
+        row++;
+      }
+      if (symbols.length > 0) {
+        sections.push({ symbols, descriptions });
+      }
+    } else {
+      row++;
+    }
+  }
+
+  return sections;
 }

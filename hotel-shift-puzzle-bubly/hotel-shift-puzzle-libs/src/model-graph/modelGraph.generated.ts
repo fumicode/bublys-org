@@ -3677,6 +3677,26 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": false
         },
         {
+          "name": "setSubNumber",
+          "params": [
+            "staffId",
+            "subNumber"
+          ],
+          "returns": "WorkingStaffGroup",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "setAllowedShifts",
+          "params": [
+            "staffId",
+            "shiftIds"
+          ],
+          "returns": "WorkingStaffGroup",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
           "name": "toPlain",
           "params": [],
           "returns": "WorkingStaffGroupPlain",
@@ -3718,6 +3738,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "dayOffStyle",
           "type": "DayOffStyle",
           "optional": true
+        },
+        {
+          "name": "subNumber",
+          "type": "number",
+          "optional": true
         }
       ],
       "getters": [
@@ -3725,6 +3750,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "allowedShiftIds",
         "hasDayOffStyleOverride",
         "dayOffStyleOverride",
+        "subNumber",
         "staffId",
         "isTemporary",
         "staff"
@@ -3796,6 +3822,15 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "overrideDayOffStyle",
           "params": [
             "style"
+          ],
+          "returns": "WorkingStaffMember",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withSubNumber",
+          "params": [
+            "subNumber"
           ],
           "returns": "WorkingStaffMember",
           "isStatic": false,

@@ -25,11 +25,13 @@ import type { SchedulePeriod } from "../schedule/SchedulePeriod.js";
 import type {
   GovernmentShiftImportData,
   StaffEntry,
+  LegendSection,
 } from "./GovernmentShiftParser.js";
 import type {
   SymbolMapping,
   ConfirmedDayOffReason,
 } from "./SymbolMapping.js";
+import type { WorkShiftSet } from "../schedule/WorkShiftSet.js";
 
 // ========== 変換結果 ==========
 
@@ -59,6 +61,10 @@ export type ShiftImportResult = {
   days: WorkingDay[];
   /** スタッフごとの変換結果 */
   staffResults: StaffImportResult[];
+  /** テンプレートの凡例セクション（正規職員 / 会計年度任用） */
+  legendSections: LegendSection[];
+  /** 月間休暇日数（AI4セルの値）。休日制約の入り口 */
+  holidayCount: number | undefined;
 };
 
 // ========== 変換関数 ==========
@@ -84,6 +90,8 @@ export function convertImportData(
     period: data.period,
     days: data.days,
     staffResults,
+    legendSections: data.legendSections,
+    holidayCount: data.holidayCount,
   };
 }
 
@@ -140,4 +148,40 @@ function convertStaffEntry(
     confirmedDaysOff,
     unknownSymbols,
   };
+}
+
+// ========== 凡例 → 可能勤務帯ID ==========
+
+/** 全角英数を半角に変換する */
+function normalizeFullWidth(text: string): string {
+  return text.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) - 0xfee0),
+  );
+}
+
+/**
+ * 凡例セクションのシンボルから、対応する勤務帯IDの配列を返す。
+ *
+ * 凡例のシンボル（全角 "Ａ" 等）→ 半角化 → SymbolMapping で解釈 →
+ * optionKey "work:<name>" から勤務帯名を取り出し → WorkShiftSet で名前引き → shift.id
+ */
+export function legendToShiftIds(
+  section: LegendSection,
+  mapping: SymbolMapping,
+  shiftSet: WorkShiftSet,
+): string[] {
+  const ids: string[] = [];
+  for (const symbol of section.symbols) {
+    const normalized = normalizeFullWidth(symbol);
+    const interp = mapping.interpret(normalized);
+    if (interp?.kind !== "wish") continue;
+    for (const opt of interp.options) {
+      const m = opt.optionKey.match(/^work:(.+)$/);
+      if (!m) continue;
+      const shiftName = m[1];
+      const shift = shiftSet.shifts.find((s) => s.name === shiftName);
+      if (shift) ids.push(shift.id);
+    }
+  }
+  return ids;
 }

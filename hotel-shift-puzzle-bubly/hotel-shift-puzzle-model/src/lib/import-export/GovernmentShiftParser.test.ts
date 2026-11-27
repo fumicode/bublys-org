@@ -267,4 +267,54 @@ describe("parseGovernmentShift", () => {
       expect(result.staffEntries[0].name).toBe("泉");
     });
   });
+
+  describe("月間休暇日数の読み取り", () => {
+    it("AI4セルの数値を読み取る", () => {
+      const grid = buildSampleGrid();
+      // col 34 (AI) の日付行（row 3）に月間休暇日数を設定
+      while (grid[3].length <= 34) grid[3].push("");
+      grid[3][34] = "8";
+      const result = parseGovernmentShift(grid);
+      expect(result.holidayCount).toBe(8);
+    });
+
+    it("AI4セルが空なら undefined", () => {
+      const grid = buildSampleGrid();
+      const result = parseGovernmentShift(grid);
+      expect(result.holidayCount).toBeUndefined();
+    });
+  });
+
+  describe("凡例の読み取り", () => {
+    it("AW/AX列の「時間帯」ヘッダー下からシンボルを読み取る", () => {
+      const grid = buildSampleGrid();
+      // col 48 (AW), col 49 (AX) に凡例を追加
+      // 正規職員セクション（row 4-9）
+      while (grid[4].length <= 49) grid[4].push("");
+      grid[4][48] = "時間帯";
+      while (grid[5].length <= 49) grid[5].push("");
+      grid[5][48] = "Ａ"; grid[5][49] = "8：00～16：45";
+      while (grid[6].length <= 49) grid[6].push("");
+      grid[6][48] = "Ｂ"; grid[6][49] = "8：30～17：15";
+      // 会計年度任用セクション（row 17-）
+      while (grid.length <= 17) grid.push(new Array(50).fill(""));
+      grid[17] = new Array(50).fill("");
+      grid[17][48] = "時間帯";
+      grid.push(new Array(50).fill(""));
+      grid[18][48] = "①"; grid[18][49] = "8:30～15:30";
+
+      const result = parseGovernmentShift(grid);
+      expect(result.legendSections).toHaveLength(2);
+      expect(result.legendSections[0].symbols).toEqual(["Ａ", "Ｂ"]);
+      expect(result.legendSections[0].descriptions).toEqual(["8：00～16：45", "8：30～17：15"]);
+      expect(result.legendSections[1].symbols).toEqual(["①"]);
+      expect(result.legendSections[1].descriptions).toEqual(["8:30～15:30"]);
+    });
+
+    it("凡例がないグリッドではlegendSectionsが空", () => {
+      const grid = buildSampleGrid();
+      const result = parseGovernmentShift(grid);
+      expect(result.legendSections).toEqual([]);
+    });
+  });
 });

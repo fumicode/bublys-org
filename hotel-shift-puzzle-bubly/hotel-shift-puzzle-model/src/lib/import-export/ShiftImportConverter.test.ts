@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { convertImportData } from "./ShiftImportConverter.js";
+import { convertImportData, legendToShiftIds } from "./ShiftImportConverter.js";
 import {
   GOVERNMENT_SYMBOL_MAPPING,
 } from "./SymbolMapping.js";
-import type { GovernmentShiftImportData } from "./GovernmentShiftParser.js";
+import type { GovernmentShiftImportData, LegendSection } from "./GovernmentShiftParser.js";
 import { WorkingDay } from "../schedule/WorkingDay.js";
 import { FourWeekPeriod } from "../schedule/SchedulePeriod.js";
+import { createGovernmentWorkShiftSet } from "../schedule/WorkShiftSet.js";
 
 function buildSampleImportData(): GovernmentShiftImportData {
   const start = WorkingDay.of(2026, 10, 25);
@@ -58,6 +59,8 @@ function buildSampleImportData(): GovernmentShiftImportData {
         ]),
       },
     ],
+    legendSections: [],
+    holidayCount: undefined,
   };
 }
 
@@ -152,5 +155,46 @@ describe("convertImportData", () => {
     it("会計年度任用のサブ番号を持つ", () => {
       expect(my().subNumber).toBe(5);
     });
+  });
+});
+
+describe("legendToShiftIds", () => {
+  const shiftSet = createGovernmentWorkShiftSet("test");
+
+  it("正規職員の凡例シンボル（全角）から勤務帯IDを引ける", () => {
+    const section: LegendSection = {
+      symbols: ["Ａ", "Ｂ", "Ｅ", "Ｈ", "h"],
+      descriptions: ["8：00～16：45", "8：30～17：15", "土・祝日", "時間外手当", "祝休"],
+    };
+    const ids = legendToShiftIds(section, GOVERNMENT_SYMBOL_MAPPING, shiftSet);
+    expect(ids).toContain("shift-A");
+    expect(ids).toContain("shift-B");
+    expect(ids).toContain("shift-E");
+    expect(ids).toContain("shift-H");
+    expect(ids).toContain("shift-h");
+    expect(ids).toHaveLength(5);
+  });
+
+  it("会計年度任用の凡例シンボルから勤務帯IDを引ける", () => {
+    const section: LegendSection = {
+      symbols: ["①", "②", "③", "⑥", "⑦"],
+      descriptions: ["8:30～15:30", "9:00～16:00", "10:15～17:15", "9:00～16:00土祝", "10:00～17:00土祝"],
+    };
+    const ids = legendToShiftIds(section, GOVERNMENT_SYMBOL_MAPPING, shiftSet);
+    expect(ids).toContain("shift-①");
+    expect(ids).toContain("shift-②");
+    expect(ids).toContain("shift-③");
+    expect(ids).toContain("shift-⑥");
+    expect(ids).toContain("shift-⑦");
+    expect(ids).toHaveLength(5);
+  });
+
+  it("辞書にないシンボルは無視される", () => {
+    const section: LegendSection = {
+      symbols: ["Ａ", "Ｘ"],
+      descriptions: ["8：00～16：45", "不明"],
+    };
+    const ids = legendToShiftIds(section, GOVERNMENT_SYMBOL_MAPPING, shiftSet);
+    expect(ids).toEqual(["shift-A"]);
   });
 });
